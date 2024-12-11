@@ -1,27 +1,35 @@
 %require "3.2"
 %language "c++"
+%define api.token.constructor
 
 %code requires {
     #include <string>
-    #include "FooLexer.hh"
     #include "structs.hh"
+
+        class FooLexer;
 }
 
-%define api.value.type union
+%code top {
+    #include "fooParser.tab.hh"
+    #include "FooLexer.hh"
 
+    namespace yy {
+        static parser::symbol_type yylex(FooLexer &lexer) {
+            return lexer.get_next_token();
+        }
+    }
+}
+
+%define api.value.type variant
+%lex-param {FooLexer &lexer}
 %parse-param {FooLexer &lexer}
 
 %header
 
-%code {
-    #define yylex lexer.yylex
-}
-
-%token  WORD
-%token  ASSIGNMENT_WORD
+%token  <std::string> WORD
+%token  <std::string> ASSIGNMENT_WORD
 %token  NEWLINE
-%type   <Program> simple_command
-%type   <std::string> cmd_name
+%type   <Program*> simple_command
 
 %%
 
@@ -51,23 +59,21 @@ compound_list    : linebreak term
 term             : term separator pipeline
                  |                pipeline
                  ;
-simple_command   : cmd_name cmd_suffix              {
-                                                        Program program{$cmd_name, {}, {}};
-                                                        std::cout << program.name << '\n';
+simple_command   : WORD cmd_suffix              {
+                                                        auto program = new Program{$WORD, {}, {}};
+                                                        std::cout << program->name << '\n';
                                                         $$ = program;
                                                     }
                  | cmd_prefix                       {
-                                                        Program program{"asgn", {}, {}};
-                                                        std::cout << program.name << '\n';
+                                                        auto program = new Program{"asgn", {}, {}};
+                                                        std::cout << program->name << '\n';
                                                         $$ = program;
                                                     }
-                 | cmd_name                         {
-                                                        Program program{$cmd_name, {}, {}};
-                                                        std::cout << program.name << '\n';
+                 | WORD                         {
+                                                        auto program = new Program{$WORD, {}, {}};
+                                                        std::cout << program->name << '\n';
                                                         $$ = program;
                                                     }
-                 ;
-cmd_name         : WORD                   /* Apply rule 7a */
                  ;
 cmd_prefix       : ASSIGNMENT_WORD
                  | /* empty */

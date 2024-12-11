@@ -11,13 +11,7 @@ letter [[:alpha:]]
 
 %%
 
-{letter}+={letter}* {
-                        *yylval = std::string(yytext, yytext + yyleng);
-                        return yy::parser::token::ASSIGNMENT_WORD;
-                    }
-{letter}+           {
-                        *yylval = std::string(yytext, yytext + yyleng);
-                        return yy::parser::token::WORD;
-                    }
-\n                  { return yy::parser::token::NEWLINE; }
+{letter}+={letter}* { return yy::parser::make_ASSIGNMENT_WORD(yytext); }
+{letter}+           { return yy::parser::make_WORD(yytext); }
+\n                  { return yy::parser::make_NEWLINE(); }
 .                   ;
