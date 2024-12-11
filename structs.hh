@@ -18,16 +18,14 @@ struct Program
     std::vector<Redirection> redirections;
 };
 
-class Pipeline : public Command
+struct Pipeline
 {
-    std::vector<Program> programs;
+    std::vector<Program*> programs;
 };
 
-class Assignment : public Command
+struct Assignment
 {
     std::string var;
-    std::string value;
-    bool exp;
 };
 
 class SubProgram : public Command

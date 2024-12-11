@@ -28,12 +28,16 @@
 
 %token  <std::string> WORD
 %token  <std::string> ASSIGNMENT_WORD
-%token  NEWLINE
-%type   <Program*> simple_command
+%token  NEWLINE PIPE
+
+%type   <Pipeline*> pipeline
+%type   <Program*> program
+%type   <Assignment*> assignment
+%type   <std::string> cmd_suffix
 
 %%
 
-program          : linebreak complete_commands linebreak
+file             : linebreak complete_commands linebreak
                  | linebreak
                  ;
 complete_commands: complete_commands newline_list complete_command
@@ -44,12 +48,16 @@ complete_command : list ';'
                  ;
 list             : list ';' pipeline
                  |          pipeline
+                 | list ';' subshell
+                 |          subshell
+                 | list ';' assignment
+                 |          assignment
                  ;
-pipeline         :                        command
-                 | pipeline '|' linebreak command
-                 ;
-command          : simple_command
-                 | subshell
+pipeline         :               program { $$ = new Pipeline{{$program}}; }
+                 | pipeline PIPE program {
+                                            $1->programs.push_back($program);
+                                            $$ = $1;
+                                         }
                  ;
 subshell         : '(' compound_list ')'
                  ;
@@ -59,24 +67,22 @@ compound_list    : linebreak term
 term             : term separator pipeline
                  |                pipeline
                  ;
-simple_command   : WORD cmd_suffix              {
-                                                        auto program = new Program{$WORD, {}, {}};
-                                                        std::cout << program->name << '\n';
-                                                        $$ = program;
-                                                    }
-                 | cmd_prefix                       {
-                                                        auto program = new Program{"asgn", {}, {}};
-                                                        std::cout << program->name << '\n';
-                                                        $$ = program;
-                                                    }
-                 | WORD                         {
-                                                        auto program = new Program{$WORD, {}, {}};
-                                                        std::cout << program->name << '\n';
-                                                        $$ = program;
-                                                    }
+program          : WORD cmd_suffix  {
+                                        auto program = new Program{$WORD, {}, {}};
+                                        std::cout << "program with args: " << program->name << '\n';
+                                        $$ = program;
+                                    }
+                 | WORD             {
+                                        auto program = new Program{$WORD, {}, {}};
+                                        std::cout << "simple program: " << program->name << '\n';
+                                        $$ = program;
+                                    }
                  ;
-cmd_prefix       : ASSIGNMENT_WORD
-                 | /* empty */
+assignment       : ASSIGNMENT_WORD  {
+                                        auto assignment = new Assignment{$ASSIGNMENT_WORD};
+                                        std::cout << "assignment: " << assignment->var << '\n';
+                                        $$ = assignment;
+                                    }
                  ;
 cmd_suffix       :            io_redirect
                  | cmd_suffix io_redirect

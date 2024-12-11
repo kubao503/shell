@@ -7,11 +7,13 @@
 
 %option yyclass="FooLexer"
 
-letter [[:alpha:]]
+letter [[:alnum:]]
+alnum [[:alnum:]]
 
 %%
 
-{letter}+={letter}* { return yy::parser::make_ASSIGNMENT_WORD(yytext); }
-{letter}+           { return yy::parser::make_WORD(yytext); }
+{letter}{alnum}*={alnum}* { return yy::parser::make_ASSIGNMENT_WORD(yytext); }
+{letter}{alnum}*           { return yy::parser::make_WORD(yytext); }
 \n                  { return yy::parser::make_NEWLINE(); }
+\|                  { return yy::parser::make_PIPE(); }
 .                   ;
