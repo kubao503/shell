@@ -4,9 +4,10 @@
 %code requires {
     #include <string>
     #include "FooLexer.hh"
+    #include "structs.hh"
 }
 
-%define api.value.type {std::string}
+%define api.value.type union
 
 %parse-param {FooLexer &lexer}
 
@@ -19,14 +20,16 @@
 %token  WORD
 %token  ASSIGNMENT_WORD
 %token  NEWLINE
+%type   <Program> simple_command
+%type   <std::string> cmd_name
 
 %%
 
 program          : linebreak complete_commands linebreak
                  | linebreak
                  ;
-complete_commands: complete_commands newline_list complete_command  { std::cout << "Parsed program\n"; }
-                 |                                complete_command  { std::cout << "Parsed program\n"; }
+complete_commands: complete_commands newline_list complete_command
+                 |                                complete_command
                  ;
 complete_command : list ';'
                  | list
@@ -48,20 +51,26 @@ compound_list    : linebreak term
 term             : term separator pipeline
                  |                pipeline
                  ;
-simple_command   : cmd_prefix cmd_word cmd_suffix
-                 | cmd_prefix cmd_word
-                 | cmd_prefix
-                 | cmd_name cmd_suffix
-                 | cmd_name
+simple_command   : cmd_name cmd_suffix              {
+                                                        Program program{$cmd_name, {}, {}};
+                                                        std::cout << program.name << '\n';
+                                                        $$ = program;
+                                                    }
+                 | cmd_prefix                       {
+                                                        Program program{"asgn", {}, {}};
+                                                        std::cout << program.name << '\n';
+                                                        $$ = program;
+                                                    }
+                 | cmd_name                         {
+                                                        Program program{$cmd_name, {}, {}};
+                                                        std::cout << program.name << '\n';
+                                                        $$ = program;
+                                                    }
                  ;
 cmd_name         : WORD                   /* Apply rule 7a */
                  ;
-cmd_word         : WORD                   /* Apply rule 7b */
-                 ;
-cmd_prefix       :            io_redirect
-                 | cmd_prefix io_redirect
-                 |            ASSIGNMENT_WORD
-                 | cmd_prefix ASSIGNMENT_WORD
+cmd_prefix       : ASSIGNMENT_WORD
+                 | /* empty */
                  ;
 cmd_suffix       :            io_redirect
                  | cmd_suffix io_redirect
