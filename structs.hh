@@ -1,14 +1,21 @@
 #include <string>
 #include <vector>
 
-class Command
+struct Command
 {
+    virtual ~Command() = default;
 };
 
-class Redirection
+enum class RedirectionType
+{
+    IN,
+    OUT
+};
+
+struct Redirection
 {
     std::string file;
-    std::string type;
+    RedirectionType type;
 };
 
 struct Program
@@ -18,17 +25,21 @@ struct Program
     std::vector<Redirection> redirections;
 };
 
-struct Pipeline
+struct Pipeline : public Command
 {
-    std::vector<Program*> programs;
+    std::vector<Program *> programs;
+
+    Pipeline(std::vector<Program *> programs) { this->programs = std::move(programs); }
 };
 
-struct Assignment
+struct Assignment : public Command
 {
     std::string var;
+
+    Assignment(std::string var) { this->var = std::move(var); }
 };
 
-class SubProgram : public Command
+struct SubProgram : public Command
 {
     std::string cmds;
 };

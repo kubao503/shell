@@ -6,7 +6,10 @@
     #include <string>
     #include "structs.hh"
 
-        class FooLexer;
+    class FooLexer;
+
+    #include <variant>
+    typedef std::variant<Redirection*, std::string> cmd_suffix_t;
 }
 
 %code top {
@@ -18,6 +21,8 @@
             return lexer.get_next_token();
         }
     }
+
+    void interpret(std::vector<Command *> commands);
 }
 
 %define api.value.type variant
@@ -28,12 +33,15 @@
 
 %token  <std::string> WORD
 %token  <std::string> ASSIGNMENT_WORD
-%token  NEWLINE PIPE
+%token  NEWLINE PIPE COMA
 
-%type   <Pipeline*> pipeline
+%type   <std::vector<Command*>> list
+%type   <Command*> command;
+%type   <Command*> pipeline
 %type   <Program*> program
-%type   <Assignment*> assignment
-%type   <std::string> cmd_suffix
+%type   <Command*> assignment
+%type   <cmd_suffix_t> cmd_suffix
+%type   <Redirection*> io_redirect
 
 %%
 
@@ -43,46 +51,37 @@ file             : linebreak complete_commands linebreak
 complete_commands: complete_commands newline_list complete_command
                  |                                complete_command
                  ;
-complete_command : list ';'
-                 | list
+complete_command : list COMA { interpret($list); }
+                 | list      { interpret($list); }
                  ;
-list             : list ';' pipeline
-                 |          pipeline
-                 | list ';' subshell
-                 |          subshell
-                 | list ';' assignment
-                 |          assignment
-                 ;
-pipeline         :               program { $$ = new Pipeline{{$program}}; }
-                 | pipeline PIPE program {
-                                            $1->programs.push_back($program);
+list             : list COMA command    {
+                                            $1.push_back($command);
                                             $$ = $1;
-                                         }
+                                        }
+                 |           command    { $$ = std::vector<Command*>{$command}; }
+                 ;
+command          : pipeline
+                 | subshell
+                 | assignment
+                 ;
+pipeline         :               program    { $$ = new Pipeline{{$program}}; }
+                 | pipeline PIPE program    {
+                                                static_cast<Pipeline*>($1)->programs.push_back($program);
+                                                $$ = $1;
+                                            }
                  ;
 subshell         : '(' compound_list ')'
                  ;
 compound_list    : linebreak term
                  | linebreak term separator
                  ;
-term             : term separator pipeline
-                 |                pipeline
+term             : term separator command
+                 |                command
                  ;
-program          : WORD cmd_suffix  {
-                                        auto program = new Program{$WORD, {}, {}};
-                                        std::cout << "program with args: " << program->name << '\n';
-                                        $$ = program;
-                                    }
-                 | WORD             {
-                                        auto program = new Program{$WORD, {}, {}};
-                                        std::cout << "simple program: " << program->name << '\n';
-                                        $$ = program;
-                                    }
+program          : WORD cmd_suffix  { $$ = new Program{$WORD, {}, {}}; }
+                 | WORD             { $$ = new Program{$WORD, {}, {}}; }
                  ;
-assignment       : ASSIGNMENT_WORD  {
-                                        auto assignment = new Assignment{$ASSIGNMENT_WORD};
-                                        std::cout << "assignment: " << assignment->var << '\n';
-                                        $$ = assignment;
-                                    }
+assignment       : ASSIGNMENT_WORD  { $$ = new Assignment{$ASSIGNMENT_WORD}; }
                  ;
 cmd_suffix       :            io_redirect
                  | cmd_suffix io_redirect
@@ -92,10 +91,8 @@ cmd_suffix       :            io_redirect
 redirect_list    :               io_redirect
                  | redirect_list io_redirect
                  ;
-io_redirect      : '<'       filename
-                 | '>'       filename
-                 ;
-filename         : WORD                      /* Apply rule 2 */
+io_redirect      : '<' WORD { $$ = new Redirection{$WORD, RedirectionType::IN}; }
+                 | '>' WORD { $$ = new Redirection{$WORD, RedirectionType::OUT}; }
                  ;
 newline_list     :              NEWLINE
                  | newline_list NEWLINE
@@ -103,7 +100,7 @@ newline_list     :              NEWLINE
 linebreak        : newline_list
                  | /* empty */
                  ;
-separator        : ';' linebreak
+separator        : COMA linebreak
                  | newline_list
                  ;
 
