@@ -22,7 +22,7 @@ struct Program
 {
     std::string name;
     std::vector<std::string> args;
-    std::vector<Redirection> redirections;
+    std::vector<Redirection *> redirections;
 };
 
 struct Pipeline : public Command

@@ -13,17 +13,21 @@ void interpret(std::vector<Command *> commands)
         {
             for (auto p : pipe->programs)
             {
-                std::cout << "Program " << p->name;
+                std::cout << "Program: " << p->name;
                 if (!p->args.empty())
-                    std::cout << "args: ";
+                    std::cout << " Args:";
                 for (auto arg : p->args)
-                    std::cout << arg << ' ';
+                    std::cout << ' ' << arg;
+                if (!p->redirections.empty())
+                    std::cout << " Red:";
+                for (auto red : p->redirections)
+                    std::cout << ' ' << red->file;
                 std::cout << '\n';
             }
         }
         else if (a = dynamic_cast<Assignment *>(command))
         {
-            std::cout << "Assignment\n";
+            std::cout << "Assignment: " << a->var << '\n';
         }
         else if (s = dynamic_cast<SubProgram *>(command))
         {
@@ -33,5 +37,7 @@ void interpret(std::vector<Command *> commands)
         {
             std::cerr << "Not recognized command\n";
         }
+
+        std::cout << '\n';
     }
 }
