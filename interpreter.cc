@@ -31,7 +31,7 @@ void interpret(std::vector<Command *> commands)
         }
         else if (s = dynamic_cast<SubProgram *>(command))
         {
-            std::cout << "SubProgram\n";
+            std::cout << "SubProgram: " << s->cmds << "\n";
         }
         else
         {

@@ -42,4 +42,6 @@ struct Assignment : public Command
 struct SubProgram : public Command
 {
     std::string cmds;
+
+    SubProgram(std::string cmds) : cmds{std::move(cmds)} {}
 };

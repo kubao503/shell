@@ -30,12 +30,14 @@
 
 %token  <std::string> WORD
 %token  <std::string> ASSIGNMENT_WORD
+%token  <std::string> SUBSHELL
 
 %type   <std::vector<Command*>> list
 %type   <Command*> command;
 %type   <Command*> pipeline
 %type   <Program*> program
 %type   <Command*> assignment
+%type   <Command*> subshell
 %type   <Program*> cmd_suffix
 %type   <Redirection*> io_redirect
 
@@ -66,13 +68,7 @@ pipeline         :              program     { $$ = new Pipeline{{$program}}; }
                                                 $$ = $1;
                                             }
                  ;
-subshell         : '(' compound_list ')'
-                 ;
-compound_list    : linebreak term
-                 | linebreak term separator
-                 ;
-term             : term separator command
-                 |                command
+subshell         : SUBSHELL { $$ = new SubProgram($SUBSHELL); }
                  ;
 program          : WORD cmd_suffix          {
                                                 $cmd_suffix->name = $WORD;
@@ -95,9 +91,6 @@ newline_list     :              '\n'
                  ;
 linebreak        : newline_list
                  | /* empty */
-                 ;
-separator        : ';' linebreak
-                 | newline_list
                  ;
 
 
