@@ -16,24 +16,9 @@ FetchContent_MakeAvailable(googletest)
 add_subdirectory(parser)
 add_subdirectory(tests)
 
-set(SRC_DIR parser)
-set(PARSER_DIR "${CMAKE_CURRENT_BINARY_DIR}")
-
-find_package(FLEX 2.6 REQUIRED)
-find_package(BISON 3.0 REQUIRED)
-
-set(LEXER_OUT "${PARSER_DIR}/parser/lexer.cc")
-set(PARSER_OUT "${PARSER_DIR}/parser/parser.cc")
-
-flex_target(LEXER "${SRC_DIR}/fooLexer.ll" "${LEXER_OUT}")
-bison_target(PARSER "${SRC_DIR}/fooParser.yy" "${PARSER_OUT}")
-add_flex_bison_dependency(LEXER PARSER)
-
 add_executable(
     ${PROJECT_NAME}
     main.cc
     interpreter.cc
-    "${LEXER_OUT}"
-    "${PARSER_OUT}"
 )
-target_include_directories(${PROJECT_NAME} PRIVATE "${PARSER_DIR}" parser)
+target_link_libraries(${PROJECT_NAME} PRIVATE parser)

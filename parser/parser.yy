@@ -6,15 +6,15 @@
     #include <string>
     #include "structs.hh"
 
-    class FooLexer;
+    class Lexer;
 }
 
 %code top {
     #include "parser.hh"
-    #include "FooLexer.hh"
+    #include "lexer.hh"
 
     namespace yy {
-        static parser::symbol_type yylex(FooLexer &lexer) {
+        static parser::symbol_type yylex(Lexer &lexer) {
             return lexer.get_next_token();
         }
     }
@@ -23,8 +23,8 @@
 }
 
 %define api.value.type variant
-%lex-param {FooLexer &lexer}
-%parse-param {FooLexer &lexer}
+%lex-param {Lexer &lexer}
+%parse-param {Lexer &lexer}
 
 %header
 

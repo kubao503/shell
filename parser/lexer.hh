@@ -2,16 +2,16 @@
 #define LEXER_H
 
 #undef YY_DECL
-#define YY_DECL yy::parser::symbol_type FooLexer::get_next_token()
+#define YY_DECL yy::parser::symbol_type Lexer::get_next_token()
 
 #if !defined(yyFlexLexerOnce)
 #include <FlexLexer.h>
 #endif
 
-#include "parser/parser.hh"
+#include "parser.hh"
 #include <string>
 
-class FooLexer : public yyFlexLexer
+class Lexer : public yyFlexLexer
 {
 public:
     virtual yy::parser::symbol_type get_next_token();

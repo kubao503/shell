@@ -1,11 +1,11 @@
 %{
-    #include "FooLexer.hh"
+    #include "lexer.hh"
     #include "parser.hh"
 %}
 
 %option c++ noyywrap
 
-%option yyclass="FooLexer"
+%option yyclass="Lexer"
 
 id [[:alnum:]]+
 

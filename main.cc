@@ -1,9 +1,9 @@
-#include "parser/FooLexer.hh"
-#include "parser/parser.hh"
+#include "parser/lexer.hh"
+#include "parser.hh"
 
 int main()
 {
-    FooLexer lexer;
+    Lexer lexer;
     yy::parser parser(lexer);
     return parser();
 }
