@@ -1,3 +1,6 @@
+#ifndef AST_H
+#define AST_H
+
 #include <string>
 #include <vector>
 
@@ -55,3 +58,5 @@ struct Pipeline : public Statement
 
     Pipeline(Statement *lhs, Statement *rhs) : lhs{lhs}, rhs{rhs} {}
 };
+
+#endif

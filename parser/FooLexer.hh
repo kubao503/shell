@@ -8,7 +8,7 @@
 #include <FlexLexer.h>
 #endif
 
-#include "fooParser.tab.hh"
+#include "parser/parser.hh"
 #include <string>
 
 class FooLexer : public yyFlexLexer

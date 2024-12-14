@@ -1,5 +1,5 @@
-#include "FooLexer.hh"
-#include "fooParser.tab.hh"
+#include "parser/FooLexer.hh"
+#include "parser/parser.hh"
 
 int main()
 {

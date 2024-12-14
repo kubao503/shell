@@ -1,6 +1,6 @@
 %{
     #include "FooLexer.hh"
-    #include "fooParser.tab.hh"
+    #include "parser.hh"
 %}
 
 %option c++ noyywrap

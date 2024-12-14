@@ -10,7 +10,7 @@
 }
 
 %code top {
-    #include "fooParser.tab.hh"
+    #include "parser.hh"
     #include "FooLexer.hh"
 
     namespace yy {
