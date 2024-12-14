@@ -42,6 +42,13 @@ struct SimpleCommand : public Statement
           assignments(std::move(assignments)),
           args(std::move(args)),
           redirections(std::move(redirections)) {}
+    ~SimpleCommand() override
+    {
+        for (auto assignment : assignments)
+            delete assignment;
+        for (auto redirection : redirections)
+            delete redirection;
+    }
 };
 
 struct SubProgram : public Statement
@@ -57,6 +64,11 @@ struct Pipeline : public Statement
     Statement *rhs;
 
     Pipeline(Statement *lhs, Statement *rhs) : lhs{lhs}, rhs{rhs} {}
+    ~Pipeline() override
+    {
+        delete lhs;
+        delete rhs;
+    }
 };
 
 #endif

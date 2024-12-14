@@ -32,14 +32,17 @@ void interpretStatement(Statement *statement)
     }
     else
     {
-        std::cerr << "Not recognized command\n";
+        std::cerr << "Not recognized statement\n";
     }
 
     std::cout << '\n';
 }
 
-void interpret(std::vector<Statement *> commands)
+void interpret(std::vector<Statement *> statements)
 {
-    for (Statement *command : commands)
-        interpretStatement(command);
+    for (Statement *statement : statements)
+    {
+        interpretStatement(statement);
+        delete statement;
+    }
 }
