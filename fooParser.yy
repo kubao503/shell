@@ -19,7 +19,7 @@
         }
     }
 
-    void interpret(std::vector<Command *> commands);
+    void interpret(std::vector<Statement *> statements);
 }
 
 %define api.value.type variant
@@ -28,18 +28,13 @@
 
 %header
 
-%token  <std::string> WORD
-%token  <std::string> ASSIGNMENT_WORD
-%token  <std::string> SUBSHELL
+%token  <std::string> WORD ASSIGNMENT_WORD SUBSHELL
 
-%type   <std::vector<Command*>> list
-%type   <Command*> command;
-%type   <Command*> pipeline
-%type   <Program*> program
-%type   <Command*> assignment
-%type   <Command*> subshell
-%type   <Program*> cmd_suffix
-%type   <Redirection*> io_redirect
+%nterm  <std::vector<Statement*>> list
+%nterm  <Statement*>            pipeline command simple_command
+%nterm  <Redirection*> io_redirect
+%nterm  <std::string> cmd_name cmd_word
+%nterm  <SimpleCommand*> cmd_prefix cmd_suffix
 
 %%
 
@@ -52,39 +47,42 @@ complete_commands: complete_commands newline_list complete_command
 complete_command : list ';'                 { interpret($list); }
                  | list                     { interpret($list); }
                  ;
-list             : list ';' command         {
-                                                $1.push_back($command);
+list             : list ';' pipeline        {
+                                                $1.push_back($pipeline);
                                                 $$ = $1;
                                             }
-                 |          command         { $$ = std::vector<Command*>{$command}; }
+                 |          pipeline        { $$ = std::vector<Statement*>{$pipeline}; }
                  ;
-command          : pipeline
-                 | subshell
-                 | assignment
+pipeline         :                        command
+                 | pipeline '|' linebreak command     { $$ = new Pipeline($1, $command); }
                  ;
-pipeline         :              program     { $$ = new Pipeline{{$program}}; }
-                 | pipeline '|' program     {
-                                                static_cast<Pipeline*>($1)->programs.push_back($program);
-                                                $$ = $1;
-                                            }
+command          : simple_command
+                 | SUBSHELL                 { $$ = new SubProgram($SUBSHELL); }
                  ;
-subshell         : SUBSHELL { $$ = new SubProgram($SUBSHELL); }
+simple_command   : cmd_prefix cmd_word cmd_suffix
+                 | cmd_prefix cmd_word
+                 | cmd_prefix
+                 | cmd_name cmd_suffix { $cmd_suffix->name = $cmd_name; $$ = $cmd_suffix; }
+                 | cmd_name { $$ = new SimpleCommand($cmd_name); }
                  ;
-program          : WORD cmd_suffix          {
-                                                $cmd_suffix->name = $WORD;
-                                                $$ = $cmd_suffix;
-                                            }
-                 | WORD                     { $$ = new Program{$WORD, {}, {}}; }
+cmd_name         : WORD                   /* Apply rule 7a */
                  ;
-assignment       : ASSIGNMENT_WORD          { $$ = new Assignment{$ASSIGNMENT_WORD}; }
+cmd_word         : WORD                   /* Apply rule 7b */
                  ;
-cmd_suffix       :            io_redirect   { $$ = new Program{"", {}, {$io_redirect}}; }
-                 | cmd_suffix io_redirect   { $1->redirections.push_back($io_redirect); $$ = $1; }
-                 |            WORD          { $$ = new Program{"", {$WORD}, {}}; }
-                 | cmd_suffix WORD          { $1->args.push_back($WORD); $$ = $1; }
+cmd_prefix       :            io_redirect
+                 | cmd_prefix io_redirect
+                 |            ASSIGNMENT_WORD
+                 | cmd_prefix ASSIGNMENT_WORD
                  ;
-io_redirect      : '<' WORD                 { $$ = new Redirection{$WORD, RedirectionType::IN}; }
-                 | '>' WORD                 { $$ = new Redirection{$WORD, RedirectionType::OUT}; }
+cmd_suffix       :            io_redirect
+                 | cmd_suffix io_redirect
+                 |            WORD { $$ = new SimpleCommand("", {}, {$WORD}, {}); }
+                 | cmd_suffix WORD { $1->args.push_back($WORD); $$ = $1; }
+                 ;
+io_redirect      : '<'       filename
+                 | '>'       filename
+                 ;
+filename         : WORD                      /* Apply rule 2 */
                  ;
 newline_list     :              '\n'
                  | newline_list '\n'

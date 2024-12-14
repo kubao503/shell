@@ -7,7 +7,7 @@
 
 %option yyclass="FooLexer"
 
-id [[:alnum:]]*
+id [[:alnum:]]+
 
 %%
 

@@ -1,9 +1,16 @@
 #include <string>
 #include <vector>
 
-struct Command
+struct Statement
 {
-    virtual ~Command() = default;
+    virtual ~Statement() = default;
+};
+
+struct Assignment : public Statement
+{
+    std::string var;
+
+    Assignment(std::string var) : var{std::move(var)} {}
 };
 
 enum class RedirectionType
@@ -18,30 +25,33 @@ struct Redirection
     RedirectionType type;
 };
 
-struct Program
+struct SimpleCommand : public Statement
 {
     std::string name;
+    std::vector<Assignment *> assignments;
     std::vector<std::string> args;
     std::vector<Redirection *> redirections;
+    SimpleCommand(std::string name,
+                  std::vector<Assignment *> assignments = {},
+                  std::vector<std::string> args = {},
+                  std::vector<Redirection *> redirections = {})
+        : name(std::move(name)),
+          assignments(std::move(assignments)),
+          args(std::move(args)),
+          redirections(std::move(redirections)) {}
 };
 
-struct Pipeline : public Command
-{
-    std::vector<Program *> programs;
-
-    Pipeline(std::vector<Program *> programs) { this->programs = std::move(programs); }
-};
-
-struct Assignment : public Command
-{
-    std::string var;
-
-    Assignment(std::string var) { this->var = std::move(var); }
-};
-
-struct SubProgram : public Command
+struct SubProgram : public Statement
 {
     std::string cmds;
 
     SubProgram(std::string cmds) : cmds{std::move(cmds)} {}
+};
+
+struct Pipeline : public Statement
+{
+    Statement *lhs;
+    Statement *rhs;
+
+    Pipeline(Statement *lhs, Statement *rhs) : lhs{lhs}, rhs{rhs} {}
 };
