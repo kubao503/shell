@@ -5,6 +5,7 @@
 %code requires {
     #include <string>
     #include "ast.hh"
+    #include "parser_output.hh"
 
     class Lexer;
 }
@@ -18,13 +19,11 @@
             return lexer.get_next_token();
         }
     }
-
-    void interpret(std::vector<Statement *> statements);
 }
 
 %define api.value.type variant
 %lex-param {Lexer &lexer}
-%parse-param {Lexer &lexer}
+%parse-param {Lexer &lexer} {ParserOutput &output}
 
 %header
 
@@ -44,8 +43,8 @@ file             : linebreak complete_commands linebreak
 complete_commands: complete_commands newline_list complete_command
                  |                                complete_command
                  ;
-complete_command : list ';'                         { interpret($list); }
-                 | list                             { interpret($list); }
+complete_command : list ';'                         { output.interpret($list); }
+                 | list                             { output.interpret($list); }
                  ;
 list             : list ';' pipeline                { $1.push_back($pipeline); $$ = $1; }
                  |          pipeline                { $$ = std::vector<Statement*>{$pipeline}; }

@@ -15,6 +15,8 @@ class Lexer : public yyFlexLexer
 {
 public:
     virtual yy::parser::symbol_type get_next_token();
+    Lexer(std::istream *arg_yyin = 0, std::ostream *arg_yyout = 0)
+        : yyFlexLexer(arg_yyin, arg_yyout) {}
 };
 
 #endif

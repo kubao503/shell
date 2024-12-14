@@ -4,9 +4,11 @@ add_executable(
     test
     test_parser.cc
 )
+
 target_link_libraries(
     test
     GTest::gtest_main
+    parser
 )
 
 include(GoogleTest)

@@ -1,7 +1,9 @@
+#include "interpreter.hh"
+
 #include "ast.hh"
 #include <iostream>
 
-void interpretStatement(Statement *statement)
+void Interpreter::interpretStatement(Statement *statement)
 {
     SimpleCommand *com;
     Pipeline *pipe;
@@ -38,7 +40,7 @@ void interpretStatement(Statement *statement)
     std::cout << '\n';
 }
 
-void interpret(std::vector<Statement *> statements)
+void Interpreter::interpret(std::vector<Statement *> statements)
 {
     for (Statement *statement : statements)
     {
