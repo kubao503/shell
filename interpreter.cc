@@ -1,4 +1,4 @@
-#include "structs.hh"
+#include "ast.hh"
 #include <iostream>
 
 void interpretStatement(Statement *statement)
@@ -25,10 +25,6 @@ void interpretStatement(Statement *statement)
     {
         interpretStatement(pipe->lhs);
         interpretStatement(pipe->rhs);
-    }
-    else if (a = dynamic_cast<Assignment *>(statement))
-    {
-        std::cout << "Assignment: " << a->var << '\n';
     }
     else if (s = dynamic_cast<SubProgram *>(statement))
     {

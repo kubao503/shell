@@ -4,7 +4,7 @@
 
 %code requires {
     #include <string>
-    #include "structs.hh"
+    #include "ast.hh"
 
     class Lexer;
 }
@@ -30,11 +30,11 @@
 
 %token  <std::string> WORD ASSIGNMENT_WORD SUBSHELL
 
-%nterm  <std::vector<Statement*>> list
-%nterm  <Statement*>            pipeline command simple_command
-%nterm  <Redirection*> io_redirect
-%nterm  <std::string> cmd_name cmd_word
-%nterm  <SimpleCommand*> cmd_prefix cmd_suffix
+%nterm  <std::vector<Statement*>>   list
+%nterm  <Statement*>                pipeline command simple_command
+%nterm  <std::string>               cmd_name cmd_word filename
+%nterm  <SimpleCommand*>            cmd_prefix cmd_suffix
+%nterm  <Redirection*>              io_redirect
 
 %%
 
@@ -44,43 +44,45 @@ file             : linebreak complete_commands linebreak
 complete_commands: complete_commands newline_list complete_command
                  |                                complete_command
                  ;
-complete_command : list ';'                 { interpret($list); }
-                 | list                     { interpret($list); }
+complete_command : list ';'                         { interpret($list); }
+                 | list                             { interpret($list); }
                  ;
-list             : list ';' pipeline        {
-                                                $1.push_back($pipeline);
-                                                $$ = $1;
-                                            }
-                 |          pipeline        { $$ = std::vector<Statement*>{$pipeline}; }
+list             : list ';' pipeline                { $1.push_back($pipeline); $$ = $1; }
+                 |          pipeline                { $$ = std::vector<Statement*>{$pipeline}; }
                  ;
 pipeline         :                        command
-                 | pipeline '|' linebreak command     { $$ = new Pipeline($1, $command); }
+                 | pipeline '|' linebreak command   { $$ = new Pipeline($1, $command); }
                  ;
 command          : simple_command
-                 | SUBSHELL                 { $$ = new SubProgram($SUBSHELL); }
+                 | SUBSHELL                         { $$ = new SubProgram($SUBSHELL); }
                  ;
-simple_command   : cmd_prefix cmd_word cmd_suffix
-                 | cmd_prefix cmd_word
-                 | cmd_prefix
-                 | cmd_name cmd_suffix { $cmd_suffix->name = $cmd_name; $$ = $cmd_suffix; }
-                 | cmd_name { $$ = new SimpleCommand($cmd_name); }
+simple_command   : cmd_prefix cmd_word cmd_suffix   {
+                                                        $1->redirections.insert($1->redirections.end(), $3->redirections.begin(), $3->redirections.end());
+                                                        $1->args.insert($1->args.end(), $3->args.begin(), $3->args.end());
+                                                        $1->name = $cmd_word;
+                                                        $$ = $1;
+                                                    }
+                 | cmd_prefix cmd_word              { $cmd_prefix->name = $cmd_word; $$ = $cmd_prefix; }
+                 | cmd_prefix                       { $$ = $cmd_prefix; }
+                 | cmd_name cmd_suffix              { $cmd_suffix->name = $cmd_name; $$ = $cmd_suffix; }
+                 | cmd_name                         { $$ = new SimpleCommand($cmd_name); }
                  ;
 cmd_name         : WORD                   /* Apply rule 7a */
                  ;
 cmd_word         : WORD                   /* Apply rule 7b */
                  ;
-cmd_prefix       :            io_redirect
-                 | cmd_prefix io_redirect
-                 |            ASSIGNMENT_WORD
-                 | cmd_prefix ASSIGNMENT_WORD
+cmd_prefix       :            io_redirect           { $$ = new SimpleCommand("", {}, {}, {$io_redirect}); }
+                 | cmd_prefix io_redirect           { $1->redirections.push_back($io_redirect); $$ = $1; }
+                 |            ASSIGNMENT_WORD       { $$ = new SimpleCommand("", {new Assignment($ASSIGNMENT_WORD)}, {}, {}); }
+                 | cmd_prefix ASSIGNMENT_WORD       { $1->assignments.push_back(new Assignment($ASSIGNMENT_WORD)); $$ = $1; }
                  ;
-cmd_suffix       :            io_redirect
-                 | cmd_suffix io_redirect
-                 |            WORD { $$ = new SimpleCommand("", {}, {$WORD}, {}); }
-                 | cmd_suffix WORD { $1->args.push_back($WORD); $$ = $1; }
+cmd_suffix       :            io_redirect           { $$ = new SimpleCommand("", {}, {}, {$io_redirect}); }
+                 | cmd_suffix io_redirect           { $1->redirections.push_back($io_redirect); $$ = $1; }
+                 |            WORD                  { $$ = new SimpleCommand("", {}, {$WORD}, {}); }
+                 | cmd_suffix WORD                  { $1->args.push_back($WORD); $$ = $1; }
                  ;
-io_redirect      : '<'       filename
-                 | '>'       filename
+io_redirect      : '<'       filename               { $$ = new Redirection{$filename, RedirectionType::IN}; }
+                 | '>'       filename               { $$ = new Redirection{$filename, RedirectionType::OUT}; }
                  ;
 filename         : WORD                      /* Apply rule 2 */
                  ;

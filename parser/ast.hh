@@ -9,7 +9,7 @@ struct Statement
     virtual ~Statement() = default;
 };
 
-struct Assignment : public Statement
+struct Assignment
 {
     std::string var;
 
