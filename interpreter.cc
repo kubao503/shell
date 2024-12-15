@@ -8,7 +8,7 @@ void Interpreter::interpretStatement(Statement *statement)
     SimpleCommand *com;
     Pipeline *pipe;
     Assignment *a;
-    SubProgram *s;
+    SubShell *s;
 
     if (com = dynamic_cast<SimpleCommand *>(statement))
     {
@@ -28,9 +28,9 @@ void Interpreter::interpretStatement(Statement *statement)
         interpretStatement(pipe->lhs);
         interpretStatement(pipe->rhs);
     }
-    else if (s = dynamic_cast<SubProgram *>(statement))
+    else if (s = dynamic_cast<SubShell *>(statement))
     {
-        std::cout << "SubProgram: " << s->cmds << "\n";
+        std::cout << "SubShell: " << s->cmds << "\n";
     }
     else
     {

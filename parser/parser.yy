@@ -53,7 +53,7 @@ pipeline         :                        command
                  | pipeline '|' linebreak command   { $$ = new Pipeline($1, $command); }
                  ;
 command          : simple_command
-                 | SUBSHELL                         { $$ = new SubProgram($SUBSHELL); }
+                 | SUBSHELL                         { $$ = new SubShell($SUBSHELL); }
                  ;
 simple_command   : cmd_prefix cmd_word cmd_suffix   {
                                                         $1->redirections.insert($1->redirections.end(), $3->redirections.begin(), $3->redirections.end());

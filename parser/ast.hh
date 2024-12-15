@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <stdexcept>
 
 struct Statement
 {
@@ -12,8 +13,16 @@ struct Statement
 struct Assignment
 {
     std::string var;
+    std::string value;
 
-    Assignment(std::string var) : var{std::move(var)} {}
+    Assignment(std::string str)
+    {
+        auto index = str.find('=');
+        if (index == str.npos)
+            throw std::runtime_error("No '=' sign passed to Assignment ctor: " + str);
+        var = str.substr(0, index);
+        value = str.substr(index + 1);
+    }
 };
 
 enum class RedirectionType
@@ -51,11 +60,11 @@ struct SimpleCommand : public Statement
     }
 };
 
-struct SubProgram : public Statement
+struct SubShell : public Statement
 {
     std::string cmds;
 
-    SubProgram(std::string cmds) : cmds{std::move(cmds)} {}
+    SubShell(std::string cmds) : cmds{std::move(cmds)} {}
 };
 
 struct Pipeline : public Statement
