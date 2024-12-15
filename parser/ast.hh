@@ -10,7 +10,7 @@ struct Statement
     virtual ~Statement() = default;
 };
 
-struct Assignment
+struct Assignment : public Statement
 {
     std::string var;
     std::string value;
@@ -40,31 +40,24 @@ struct Redirection
 struct SimpleCommand : public Statement
 {
     std::string name;
-    std::vector<Assignment *> assignments;
     std::vector<std::string> args;
-    std::vector<Redirection *> redirections;
+    std::vector<Redirection> redirections;
     SimpleCommand(std::string name,
                   std::vector<Assignment *> assignments = {},
                   std::vector<std::string> args = {},
-                  std::vector<Redirection *> redirections = {})
+                  std::vector<Redirection> redirections = {})
         : name(std::move(name)),
-          assignments(std::move(assignments)),
           args(std::move(args)),
           redirections(std::move(redirections)) {}
-    ~SimpleCommand() override
-    {
-        for (auto assignment : assignments)
-            delete assignment;
-        for (auto redirection : redirections)
-            delete redirection;
-    }
 };
 
 struct SubShell : public Statement
 {
     std::string cmds;
+    std::vector<Redirection> redirections;
 
-    SubShell(std::string cmds) : cmds{std::move(cmds)} {}
+    SubShell(std::string cmds, std::vector<Redirection> redirections = {})
+        : cmds{std::move(cmds)}, redirections{std::move(redirections)} {}
 };
 
 struct Pipeline : public Statement

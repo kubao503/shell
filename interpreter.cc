@@ -20,7 +20,7 @@ void Interpreter::interpretStatement(Statement *statement)
         if (!com->redirections.empty())
             std::cout << " Red:";
         for (auto red : com->redirections)
-            std::cout << ' ' << red->file;
+            std::cout << ' ' << red.file;
         std::cout << '\n';
     }
     else if (pipe = dynamic_cast<Pipeline *>(statement))
