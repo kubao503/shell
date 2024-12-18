@@ -6,6 +6,7 @@
     #include <string>
     #include "ast.hh"
     #include "parser_output.hh"
+    #include "wrapper.hh"
 
     class Lexer;
 }
@@ -29,10 +30,10 @@
 
 %token  <std::string> WORD ASSIGNMENT_WORD SUBSHELL
 
-%nterm  <std::vector<Statement*>>   list
-%nterm  <Statement*>                pipeline command simple_command
+%nterm  <std::vector<Wrapper<Statement>>>   list
+%nterm  <Wrapper<Statement>>                pipeline command simple_command
 %nterm  <std::string>               cmd_name cmd_word filename
-%nterm  <SimpleCommand*>            cmd_prefix cmd_suffix
+%nterm  <Wrapper<SimpleCommand>>            cmd_prefix cmd_suffix
 %nterm  <std::vector<Redirection>>  redirect_list
 %nterm  <Redirection>               io_redirect
 
@@ -48,15 +49,15 @@ complete_command : list ';'                         { output.interpret($list); }
                  | list                             { output.interpret($list); }
                  ;
 list             : list ';' pipeline                { $1.push_back($pipeline); $$ = $1; }
-                 |          pipeline                { $$ = std::vector<Statement*>{$pipeline}; }
+                 |          pipeline                { $$ = std::vector<Wrapper<Statement>>{$pipeline}; }
                  ;
 pipeline         :                        command
-                 | pipeline '|' linebreak command   { $$ = new Pipeline($1, $command); }
+                 | pipeline '|' linebreak command   { $$ = make_wrapped<Pipeline>($1, $command); }
                  ;
 command          : simple_command
-                 | ASSIGNMENT_WORD                  { $$ = new Assignment($ASSIGNMENT_WORD); }
-                 | SUBSHELL                         { $$ = new SubShell($SUBSHELL); }
-                 | SUBSHELL redirect_list           { $$ = new SubShell($SUBSHELL); }
+                 | ASSIGNMENT_WORD                  { $$ = make_wrapped<Assignment>($ASSIGNMENT_WORD); }
+                 | SUBSHELL                         { $$ = make_wrapped<SubShell>($SUBSHELL); }
+                 | SUBSHELL redirect_list           { $$ = make_wrapped<SubShell>($SUBSHELL); }
                  ;
 simple_command   : cmd_prefix cmd_word cmd_suffix   {
                                                         $1->redirections.insert($1->redirections.end(), $3->redirections.begin(), $3->redirections.end());
@@ -66,18 +67,18 @@ simple_command   : cmd_prefix cmd_word cmd_suffix   {
                                                     }
                  | cmd_prefix cmd_word              { $cmd_prefix->name = $cmd_word; $$ = $cmd_prefix; }
                  | cmd_name cmd_suffix              { $cmd_suffix->name = $cmd_name; $$ = $cmd_suffix; }
-                 | cmd_name                         { $$ = new SimpleCommand($cmd_name); }
+                 | cmd_name                         { $$ = make_wrapped<SimpleCommand>($cmd_name); }
                  ;
 cmd_name         : WORD                   /* Apply rule 7a */
                  ;
 cmd_word         : WORD                   /* Apply rule 7b */
                  ;
-cmd_prefix       :            io_redirect           { $$ = new SimpleCommand("", {}, {}, {$io_redirect}); }
+cmd_prefix       :            io_redirect           { $$ = make_wrapped<SimpleCommand>(); $$->redirections = {$io_redirect}; }
                  | cmd_prefix io_redirect           { $1->redirections.push_back($io_redirect); $$ = $1; }
                  ;
-cmd_suffix       :            io_redirect           { $$ = new SimpleCommand("", {}, {}, {$io_redirect}); }
+cmd_suffix       :            io_redirect           { $$ = make_wrapped<SimpleCommand>(); $$->redirections = {$io_redirect}; }
                  | cmd_suffix io_redirect           { $1->redirections.push_back($io_redirect); $$ = $1; }
-                 |            WORD                  { $$ = new SimpleCommand("", {}, {$WORD}, {}); }
+                 |            WORD                  { $$ = make_wrapped<SimpleCommand>(); $$->args = {$WORD}; }
                  | cmd_suffix WORD                  { $1->args.push_back($WORD); $$ = $1; }
                  ;
 redirect_list    :               io_redirect        { $$ = std::vector<Redirection>{$io_redirect}; }

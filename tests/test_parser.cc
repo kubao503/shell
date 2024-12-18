@@ -8,8 +8,8 @@
 class TestOutput : public ParserOutput
 {
 public:
-    std::vector<Statement *> statements_;
-    void interpret(std::vector<Statement *> statements)
+    std::vector<Wrapper<Statement>> statements_;
+    void interpret(std::vector<Wrapper<Statement>> statements)
     {
         statements_.insert(statements_.end(), statements.begin(), statements.end());
     }
@@ -36,7 +36,7 @@ TEST_F(ParserTest, parse_success)
     ASSERT_FALSE((*parser_)());
     ASSERT_EQ(output_.statements_.size(), 1);
 
-    auto *simpleCommand = dynamic_cast<SimpleCommand *>(output_.statements_.at(0));
+    const auto *simpleCommand = dynamic_cast<const SimpleCommand *>(output_.statements_.at(0).get());
     ASSERT_TRUE(simpleCommand);
 
     EXPECT_EQ(simpleCommand->name, "prog");

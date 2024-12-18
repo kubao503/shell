@@ -1,6 +1,7 @@
 #ifndef AST_H
 #define AST_H
 
+#include "wrapper.hh"
 #include <string>
 #include <vector>
 #include <stdexcept>
@@ -42,7 +43,7 @@ struct SimpleCommand : public Statement
     std::string name;
     std::vector<std::string> args;
     std::vector<Redirection> redirections;
-    SimpleCommand(std::string name,
+    SimpleCommand(std::string name = "",
                   std::vector<Assignment *> assignments = {},
                   std::vector<std::string> args = {},
                   std::vector<Redirection> redirections = {})
@@ -62,15 +63,10 @@ struct SubShell : public Statement
 
 struct Pipeline : public Statement
 {
-    Statement *lhs;
-    Statement *rhs;
+    Wrapper<Statement> lhs;
+    Wrapper<Statement> rhs;
 
-    Pipeline(Statement *lhs, Statement *rhs) : lhs{lhs}, rhs{rhs} {}
-    ~Pipeline() override
-    {
-        delete lhs;
-        delete rhs;
-    }
+    Pipeline(Wrapper<Statement> lhs, Wrapper<Statement> rhs) : lhs{lhs}, rhs{rhs} {}
 };
 
 #endif
