@@ -1,17 +1,16 @@
 #include "interpreter.hh"
 
 #include "ast.hh"
-#include "wrapper.hh"
 #include <iostream>
 
-void Interpreter::interpretStatement(const Wrapper<Statement> &statement)
+void Interpreter::interpretStatement(const Statement *statement)
 {
     const SimpleCommand *com;
     const Pipeline *pipe;
     const Assignment *a;
     const SubShell *s;
 
-    if (com = dynamic_cast<const SimpleCommand *>(statement.get()))
+    if (com = dynamic_cast<const SimpleCommand *>(statement))
     {
         std::cout << "SimpleCommand: " << com->name;
         if (!com->args.empty())
@@ -24,12 +23,12 @@ void Interpreter::interpretStatement(const Wrapper<Statement> &statement)
             std::cout << ' ' << red.file;
         std::cout << '\n';
     }
-    else if (pipe = dynamic_cast<const Pipeline *>(statement.get()))
+    else if (pipe = dynamic_cast<const Pipeline *>(statement))
     {
-        interpretStatement(pipe->lhs);
-        interpretStatement(pipe->rhs);
+        interpretStatement(pipe->lhs.get());
+        interpretStatement(pipe->rhs.get());
     }
-    else if (s = dynamic_cast<const SubShell *>(statement.get()))
+    else if (s = dynamic_cast<const SubShell *>(statement))
     {
         std::cout << "SubShell: " << s->cmds << "\n";
     }
@@ -41,8 +40,8 @@ void Interpreter::interpretStatement(const Wrapper<Statement> &statement)
     std::cout << '\n';
 }
 
-void Interpreter::interpret(std::vector<Wrapper<Statement>> statements)
+void Interpreter::interpret(std::vector<std::unique_ptr<Statement>> statements)
 {
     for (const auto &statement : statements)
-        interpretStatement(statement);
+        interpretStatement(statement.get());
 }

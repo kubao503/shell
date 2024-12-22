@@ -1,10 +1,10 @@
 #ifndef AST_H
 #define AST_H
 
-#include "wrapper.hh"
 #include <string>
 #include <vector>
 #include <stdexcept>
+#include <memory>
 
 struct Statement
 {
@@ -63,10 +63,10 @@ struct SubShell : public Statement
 
 struct Pipeline : public Statement
 {
-    Wrapper<Statement> lhs;
-    Wrapper<Statement> rhs;
+    std::unique_ptr<Statement> lhs;
+    std::unique_ptr<Statement> rhs;
 
-    Pipeline(Wrapper<Statement> lhs, Wrapper<Statement> rhs) : lhs{lhs}, rhs{rhs} {}
+    Pipeline(std::unique_ptr<Statement> lhs, std::unique_ptr<Statement> rhs) : lhs{std::move(lhs)}, rhs{std::move(rhs)} {}
 };
 
 #endif

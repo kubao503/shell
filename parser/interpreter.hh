@@ -5,8 +5,8 @@
 
 class Interpreter : public ParserOutput
 {
-    void interpretStatement(const Wrapper<Statement> &statement);
-    void interpret(std::vector<Wrapper<Statement>> statements);
+    void interpretStatement(const Statement *statement);
+    void interpret(std::vector<std::unique_ptr<Statement>> statements);
 };
 
 #endif

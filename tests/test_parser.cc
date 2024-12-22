@@ -8,10 +8,10 @@
 class TestOutput : public ParserOutput
 {
 public:
-    std::vector<Wrapper<Statement>> statements_;
-    void interpret(std::vector<Wrapper<Statement>> statements)
+    std::vector<std::unique_ptr<Statement>> statements_;
+    void interpret(std::vector<std::unique_ptr<Statement>> statements)
     {
-        statements_.insert(statements_.end(), statements.begin(), statements.end());
+        statements_ = std::move(statements);
     }
 };
 
