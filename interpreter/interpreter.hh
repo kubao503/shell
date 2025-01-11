@@ -27,6 +27,8 @@ class Interpreter : public ParserOutput, StatementVisitor
     void visit(const Assignment *assignment) override;
     void visit(const Pipeline *pipeline) override;
     void visit(const Subshell *subshell) override;
+    int redirectToFile(const Redirection *redirection);
+    int checkForRedirections(const SimpleCommand* command);
 };
 
 #endif

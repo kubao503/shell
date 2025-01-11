@@ -3,6 +3,7 @@
 #include "ast.hh"
 #include <iostream>
 #include <sys/wait.h>
+#include <fcntl.h>
 
 void Interpreter::interpret(std::vector<std::unique_ptr<Statement>> statements)
 {
@@ -11,15 +12,12 @@ void Interpreter::interpret(std::vector<std::unique_ptr<Statement>> statements)
 }
 
 void Interpreter::visit(const SimpleCommand *simpleCommand) {
+
     if (fork() == 0)
     {
-        if (simpleCommand->args.empty())
+        if (checkForRedirections(simpleCommand) == 0)
         {
-            execlp(simpleCommand->name.c_str(), simpleCommand->name.c_str(), NULL);
-        }
-        else
-        {
-            executeCommandArgs(simpleCommand);
+            executeCommand(simpleCommand);
         }
     }
 }
@@ -68,7 +66,10 @@ void Interpreter::runSimpleCommandStartPipe(const SimpleCommand *com, int fds1[]
         dup2(fds1[1], 1);
         close(fds1[1]);
         close(fds1[0]);
-        executeCommand(com);
+        if (checkForRedirections(com) == 0)
+        {
+            executeCommand(com);
+        }
     }
 }
 
@@ -79,7 +80,10 @@ void Interpreter::runSimpleCommandEndPipe(const SimpleCommand *com, int fds1[])
         dup2(fds1[0], 0);
         close(fds1[0]);
         close(fds1[1]);
-        executeCommand(com);
+        if (checkForRedirections(com) == 0)
+        {
+            executeCommand(com);
+        }
     }
 }
 
@@ -93,7 +97,10 @@ void Interpreter::runSimpleCommandPipe(const SimpleCommand *com, int fds1[], int
         dup2(fds2[1], 1);
         close(fds1[0]);
         close(fds2[1]);
-        executeCommand(com);
+        if (checkForRedirections(com) == 0)
+        {
+            executeCommand(com);
+        }
     }
 }
 
@@ -135,4 +142,40 @@ void Interpreter::PipelineConverter::visit(const SimpleCommand *simpleCommand) {
 void Interpreter::PipelineConverter::visit(const Pipeline *pipeline) {
     pipeline->lhs->accept(this);
     pipeline->rhs->accept(this);
+}
+
+int Interpreter::redirectToFile(const Redirection *redirection)
+{
+    int fd;
+    if (redirection->type == RedirectionType::OUT)
+    {
+        fd = open(redirection->file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+        if (fd == -1)
+        {
+            perror("Error creating file");
+            return 1;
+        }
+        dup2(fd, STDOUT_FILENO);
+    }
+    else
+    {
+        fd = open(redirection->file.c_str(), O_RDONLY);
+        if (fd == -1)
+        {
+            perror("Error opening file");
+            return 1;
+        }
+        dup2(fd, STDIN_FILENO);
+    }
+    close(fd);
+    return 0;
+}
+
+int Interpreter::checkForRedirections(const SimpleCommand* command)
+{
+    if (!command->redirections.empty())
+    {
+        return redirectToFile(&command->redirections.at(0));
+    }
+    return 0;
 }
