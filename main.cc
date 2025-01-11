@@ -1,6 +1,6 @@
-#include "parser/lexer.hh"
+#include "interpreter/interpreter.hh"
 #include "parser.hh"
-#include "interpreter.hh"
+#include "parser/lexer.hh"
 
 int main()
 {

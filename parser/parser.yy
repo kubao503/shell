@@ -55,8 +55,8 @@ pipeline         :                        command   { $$ = std::move($1); }
                  ;
 command          : simple_command                   { $$ = std::move($1); }
                  | ASSIGNMENT_WORD                  { $$ = std::make_unique<Assignment>($ASSIGNMENT_WORD); }
-                 | SUBSHELL                         { $$ = std::make_unique<SubShell>($SUBSHELL); }
-                 | SUBSHELL redirect_list           { $$ = std::make_unique<SubShell>($SUBSHELL); }
+                 | SUBSHELL                         { $$ = std::make_unique<Subshell>($SUBSHELL); }
+                 | SUBSHELL redirect_list           { $$ = std::make_unique<Subshell>($SUBSHELL); }
                  ;
 simple_command   : cmd_prefix cmd_word cmd_suffix   {
                                                         $1->redirections.insert($1->redirections.end(), $3->redirections.begin(), $3->redirections.end());
