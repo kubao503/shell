@@ -10,24 +10,6 @@ void Interpreter::interpret(std::vector<std::unique_ptr<Statement>> statements)
         statement->accept(this);
 }
 
-void Interpreter::createVectorFromPipeline(const Statement *statement, std::vector<const SimpleCommand *> *commands)
-{
-    const SimpleCommand *com;
-    const Pipeline *pipe;
-    const Assignment *a;
-    const Subshell *s;
-
-    if (com = dynamic_cast<const SimpleCommand *>(statement))
-    {
-        commands->push_back(com);
-    }
-    else if (pipe = dynamic_cast<const Pipeline *>(statement))
-    {
-        createVectorFromPipeline(pipe->lhs.get(), commands);
-        createVectorFromPipeline(pipe->rhs.get(), commands);
-    }
-}
-
 void Interpreter::visit(const SimpleCommand *simpleCommand) {
     if (fork() == 0)
     {
@@ -43,21 +25,20 @@ void Interpreter::visit(const SimpleCommand *simpleCommand) {
 }
 
 void Interpreter::visit(const Pipeline *pipeline) {
-    std::vector<const SimpleCommand *> vectorOfCommands;
-    createVectorFromPipeline(pipeline, &vectorOfCommands);
+    std::vector<const SimpleCommand *> commands = convertPipeline(pipeline);
 
     int fds1[2];
 
-    for (size_t i = 0; i < vectorOfCommands.size(); i++)
+    for (size_t i = 0; i < commands.size(); i++)
     {
         if (i == 0)
         {
             pipe(fds1);
-            runSimpleCommandStartPipe(vectorOfCommands.at(i), fds1);
+            runSimpleCommandStartPipe(commands.at(i), fds1);
         }
-        else if (i == vectorOfCommands.size() - 1)
+        else if (i == commands.size() - 1)
         {
-            runSimpleCommandEndPipe(vectorOfCommands.at(i), fds1);
+            runSimpleCommandEndPipe(commands.at(i), fds1);
             close(fds1[0]);
             close(fds1[1]);
         }
@@ -66,7 +47,7 @@ void Interpreter::visit(const Pipeline *pipeline) {
             int fds2[2];
 
             pipe(fds2);
-            runSimpleCommandPipe(vectorOfCommands.at(i), fds1, fds2);
+            runSimpleCommandPipe(commands.at(i), fds1, fds2);
             close(fds1[0]);
             close(fds1[1]);
             fds1[0] = fds2[0];
@@ -74,7 +55,7 @@ void Interpreter::visit(const Pipeline *pipeline) {
         }
     }
 
-    for (size_t i = 0; i < vectorOfCommands.size(); i++)
+    for (size_t i = 0; i < commands.size(); i++)
     {
         wait(nullptr);
     }
@@ -142,4 +123,16 @@ void Interpreter::executeCommand(const SimpleCommand *com)
 void Interpreter::visit(const Assignment *assignment) {
 }
 void Interpreter::visit(const Subshell *subshell) {
+}
+std::vector<const SimpleCommand *> Interpreter::convertPipeline(const Pipeline *pipeline) {
+    std::unique_ptr<PipelineConverter> pipelineSerializer = std::make_unique<PipelineConverter>();
+    pipeline->accept(pipelineSerializer.get());
+    return pipelineSerializer->getResult();
+}
+void Interpreter::PipelineConverter::visit(const SimpleCommand *simpleCommand) {
+    result.push_back(simpleCommand);
+}
+void Interpreter::PipelineConverter::visit(const Pipeline *pipeline) {
+    pipeline->lhs->accept(this);
+    pipeline->rhs->accept(this);
 }

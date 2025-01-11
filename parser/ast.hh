@@ -23,7 +23,7 @@ public:
 struct Statement
 {
     virtual ~Statement() = default;
-    virtual void accept(StatementVisitor* visitor) = 0;
+    virtual void accept(StatementVisitor* visitor) const = 0;
 };
 
 struct Assignment : public Statement
@@ -39,7 +39,7 @@ struct Assignment : public Statement
         var = str.substr(0, index);
         value = str.substr(index + 1);
     }
-    void accept(StatementVisitor *visitor) override {
+    void accept(StatementVisitor *visitor) const override {
         visitor->visit(this);
     }
 };
@@ -67,7 +67,7 @@ struct SimpleCommand : public Statement
         : name(std::move(name)),
           args(std::move(args)),
           redirections(std::move(redirections)) {}
-    void accept(StatementVisitor *visitor) override {
+    void accept(StatementVisitor *visitor) const override {
         visitor->visit(this);
     }
 };
@@ -79,7 +79,7 @@ struct Subshell : public Statement
 
     explicit Subshell(std::string cmds, std::vector<Redirection> redirections = {})
         : cmds{std::move(cmds)}, redirections{std::move(redirections)} {}
-    void accept(StatementVisitor *visitor) override {
+    void accept(StatementVisitor *visitor) const override {
         visitor->visit(this);
     }
 };
@@ -90,7 +90,7 @@ struct Pipeline : public Statement
     std::unique_ptr<Statement> rhs;
 
     Pipeline(std::unique_ptr<Statement> lhs, std::unique_ptr<Statement> rhs) : lhs{std::move(lhs)}, rhs{std::move(rhs)} {}
-    void accept(StatementVisitor *visitor) override {
+    void accept(StatementVisitor *visitor) const override {
         visitor->visit(this);
     }
 };
