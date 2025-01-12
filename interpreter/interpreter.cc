@@ -1,33 +1,26 @@
 #include "interpreter.hh"
 
 #include "ast.hh"
+#include <fcntl.h>
 #include <iostream>
 #include <sys/wait.h>
-#include <fcntl.h>
 
-void Interpreter::interpret(std::vector<std::unique_ptr<Statement>> statements)
-{
-    for (const auto &statement : statements)
+void Interpreter::interpret(std::vector<std::unique_ptr<Statement>> statements) {
+    for (const auto &statement: statements)
         statement->accept(this);
 }
 
-void Interpreter::redirectToFile(const Redirection *redirection)
-{
+void Interpreter::redirectToFile(const Redirection *redirection) {
     int fd;
-    if (redirection->type == RedirectionType::OUT)
-    {
+    if (redirection->type == RedirectionType::OUT) {
         fd = open(redirection->file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
-        if (fd == -1)
-        {
+        if (fd == -1) {
             throw std::runtime_error("Error creating file");
         }
         dup2(fd, STDOUT_FILENO);
-    }
-    else
-    {
+    } else {
         fd = open(redirection->file.c_str(), O_RDONLY);
-        if (fd == -1)
-        {
+        if (fd == -1) {
             throw std::runtime_error("Error creating file");
         }
         dup2(fd, STDIN_FILENO);
@@ -36,27 +29,25 @@ void Interpreter::redirectToFile(const Redirection *redirection)
 }
 
 void Interpreter::visit(const SimpleCommand *simpleCommand) {
-    if (fork() == 0)
-    {
+    if (fork() == 0) {
         executeCommand(simpleCommand);
     }
+
+    wait(nullptr);
 }
 
 void Interpreter::executeCommand(const SimpleCommand *com) {
-    if (!com->redirections.empty())
-    {
+    if (!com->redirections.empty()) {
         redirectToFile(&com->redirections.at(0));
     }
-    if (com->args.empty())
-    {
+    if (executeBuiltinCommand(com))
+        return;
+    if (com->args.empty()) {
         execlp(com->name.c_str(), com->name.c_str(), NULL);
-    }
-    else
-    {
+    } else {
         std::vector<const char *> args;
         args.push_back(com->name.c_str());
-        for (const auto &arg : com->args)
-        {
+        for (const auto &arg: com->args) {
             args.push_back(arg.c_str());
         }
         args.push_back(nullptr);
@@ -64,26 +55,39 @@ void Interpreter::executeCommand(const SimpleCommand *com) {
     }
 }
 
+bool Interpreter::executeBuiltinCommand(const SimpleCommand *com) {
+    if (com->name == "cd") {
+        if (com->args.size() != 1)
+            throw std::runtime_error("Expected one argument");
+        auto path = com->args.at(0).c_str();
+        if (chdir(path))
+            throw std::runtime_error("cd failed with error code: " + std::to_string(errno));
+        char buf[4096];
+        auto absPath = getcwd(buf, sizeof(buf));
+        if (!absPath)
+            std::runtime_error("getcwd failed");
+        if (setenv("PWD", absPath, true))
+            throw std::runtime_error("PWD failed with error code: " + std::to_string(errno));
+
+        return true;
+    }
+    return false;
+}
+
 void Interpreter::visit(const Pipeline *pipeline) {
     std::vector<const SimpleCommand *> commands = convertPipeline(pipeline);
 
     int fds1[2];
 
-    for (size_t i = 0; i < commands.size(); i++)
-    {
-        if (i == 0)
-        {
+    for (size_t i = 0; i < commands.size(); i++) {
+        if (i == 0) {
             pipe(fds1);
             runSimpleCommandStartPipe(commands.at(i), fds1);
-        }
-        else if (i == commands.size() - 1)
-        {
+        } else if (i == commands.size() - 1) {
             runSimpleCommandEndPipe(commands.at(i), fds1);
             close(fds1[0]);
             close(fds1[1]);
-        }
-        else
-        {
+        } else {
             int fds2[2];
 
             pipe(fds2);
@@ -95,27 +99,24 @@ void Interpreter::visit(const Pipeline *pipeline) {
         }
     }
 
-    for (size_t i = 0; i < commands.size(); i++)
-    {
+    for (size_t i = 0; i < commands.size(); i++) {
         wait(nullptr);
     }
 }
 
-void Interpreter::runSimpleCommandStartPipe(const SimpleCommand *com, int fds1[])
-{
-    if (fork() == 0)
-    {
+void Interpreter::runSimpleCommandStartPipe(const SimpleCommand *com, int fds1[]) {
+    if (fork() == 0) {
         dup2(fds1[1], 1);
         close(fds1[1]);
         close(fds1[0]);
         executeCommand(com);
     }
+
+    wait(nullptr);
 }
 
-void Interpreter::runSimpleCommandEndPipe(const SimpleCommand *com, int fds1[])
-{
-    if (fork() == 0)
-    {
+void Interpreter::runSimpleCommandEndPipe(const SimpleCommand *com, int fds1[]) {
+    if (fork() == 0) {
         dup2(fds1[0], 0);
         close(fds1[0]);
         close(fds1[1]);
@@ -123,10 +124,8 @@ void Interpreter::runSimpleCommandEndPipe(const SimpleCommand *com, int fds1[])
     }
 }
 
-void Interpreter::runSimpleCommandPipe(const SimpleCommand *com, int fds1[], int fds2[])
-{
-    if (fork() == 0)
-    {
+void Interpreter::runSimpleCommandPipe(const SimpleCommand *com, int fds1[], int fds2[]) {
+    if (fork() == 0) {
         close(fds1[1]);
         close(fds2[0]);
         dup2(fds1[0], 0);
