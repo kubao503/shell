@@ -29,6 +29,8 @@ void Interpreter::redirectToFile(const Redirection *redirection) {
 }
 
 void Interpreter::visit(const SimpleCommand *simpleCommand) {
+    if (executeBuiltinCommand(simpleCommand))
+        return;
     if (fork() == 0) {
         executeCommand(simpleCommand);
     }
@@ -40,8 +42,6 @@ void Interpreter::executeCommand(const SimpleCommand *com) {
     if (!com->redirections.empty()) {
         redirectToFile(&com->redirections.at(0));
     }
-    if (executeBuiltinCommand(com))
-        return;
     if (com->args.empty()) {
         execlp(com->name.c_str(), com->name.c_str(), NULL);
     } else {
@@ -109,6 +109,8 @@ void Interpreter::runSimpleCommandStartPipe(const SimpleCommand *com, int fds1[]
         dup2(fds1[1], 1);
         close(fds1[1]);
         close(fds1[0]);
+        if (executeBuiltinCommand(com))
+            exit(0);
         executeCommand(com);
     }
 
@@ -120,6 +122,8 @@ void Interpreter::runSimpleCommandEndPipe(const SimpleCommand *com, int fds1[]) 
         dup2(fds1[0], 0);
         close(fds1[0]);
         close(fds1[1]);
+        if (executeBuiltinCommand(com))
+            exit(0);
         executeCommand(com);
     }
 }
@@ -132,6 +136,8 @@ void Interpreter::runSimpleCommandPipe(const SimpleCommand *com, int fds1[], int
         dup2(fds2[1], 1);
         close(fds1[0]);
         close(fds2[1]);
+        if (executeBuiltinCommand(com))
+            exit(0);
         executeCommand(com);
     }
 }
