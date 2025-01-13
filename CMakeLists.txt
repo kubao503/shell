@@ -19,6 +19,6 @@ add_subdirectory(tests)
 add_executable(
     ${PROJECT_NAME}
     main.cc
-    interpreter.cc
+    interpreter/interpreter.cc
 )
 target_link_libraries(${PROJECT_NAME} PRIVATE parser)

@@ -19,6 +19,8 @@
             return lexer.get_next_token();
         }
     }
+
+    void prompt();
 }
 
 %define api.value.type variant
@@ -51,12 +53,12 @@ list             : list ';' pipeline                { $1.push_back(std::move($pi
                  |          pipeline                { $$ = std::vector<std::unique_ptr<Statement>>(); $$.push_back(std::move($pipeline)); }
                  ;
 pipeline         :                        command   { $$ = std::move($1); }
-                 | pipeline '|' linebreak command   { $$ = std::make_unique<Pipeline>(std::move($1), std::move($command)); }
+                 | pipeline '|' pipeline_linebreak command  { $$ = std::make_unique<Pipeline>(std::move($1), std::move($command)); }
                  ;
 command          : simple_command                   { $$ = std::move($1); }
                  | ASSIGNMENT_WORD                  { $$ = std::make_unique<Assignment>($ASSIGNMENT_WORD); }
-                 | SUBSHELL                         { $$ = std::make_unique<SubShell>($SUBSHELL); }
-                 | SUBSHELL redirect_list           { $$ = std::make_unique<SubShell>($SUBSHELL); }
+                 | SUBSHELL                         { $$ = std::make_unique<Subshell>($SUBSHELL); }
+                 | SUBSHELL redirect_list           { $$ = std::make_unique<Subshell>($SUBSHELL); }
                  ;
 simple_command   : cmd_prefix cmd_word cmd_suffix   {
                                                         $1->redirections.insert($1->redirections.end(), $3->redirections.begin(), $3->redirections.end());
@@ -88,17 +90,27 @@ io_redirect      : '<'       filename               { $$ = Redirection{$filename
                  ;
 filename         : WORD                      /* Apply rule 2 */
                  ;
-newline_list     :              '\n'
-                 | newline_list '\n'
+newline_list     :              '\n'                { prompt(); }
+                 | newline_list '\n'                { prompt(); }
                  ;
 linebreak        : newline_list
                  | /* empty */
                  ;
-
+pipeline_newline_list     :                       '\n'
+                          | pipeline_newline_list '\n'
+                          ;
+pipeline_linebreak        : pipeline_newline_list
+                          | /* empty */
+                          ;
 
 %%
 
 void yy::parser::error(const std::string &message)
 {
     std::cerr << "Error: " << message << std::endl;
+}
+
+void prompt()
+{
+    std::cout << "> ";
 }
