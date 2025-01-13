@@ -22,7 +22,7 @@ protected:
     {
         stream_ = std::istringstream(input);
         lexer_ = std::make_unique<Lexer>(&stream_);
-        parser_ = std::make_unique<yy::parser>(*lexer_, output_);
+        parser_ = std::make_unique<yy::parser>(*lexer_, output_, false);
     }
     std::istringstream stream_;
     std::unique_ptr<Lexer> lexer_;

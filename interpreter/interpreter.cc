@@ -1,7 +1,10 @@
 #include "interpreter.hh"
 
 #include "ast.hh"
+#include "lexer.hh"
+
 #include <fcntl.h>
+#include <fstream>
 #include <iostream>
 #include <sys/wait.h>
 
@@ -40,8 +43,7 @@ void Interpreter::visit(const SimpleCommand *simpleCommand) {
 
 void Interpreter::executeCommand(const SimpleCommand *com) {
     if (!com->redirections.empty()) {
-        for (auto redirection : com->redirections)
-        {
+        for (auto redirection: com->redirections) {
             redirectToFile(&redirection);
         }
     }
@@ -71,6 +73,19 @@ bool Interpreter::executeBuiltinCommand(const SimpleCommand *com) {
             std::runtime_error("getcwd failed");
         if (setenv("PWD", absPath, true))
             throw std::runtime_error("PWD failed with error code: " + std::to_string(errno));
+
+        return true;
+    } else if (com->name == ".") {
+        if (com->args.size() != 1)
+            throw std::runtime_error("Expected file name");
+        const auto &fileName = com->args.at(0);
+        std::ifstream script(fileName);
+        if (!script)
+            throw std::runtime_error("Error: Could not open file " + fileName);
+        Lexer lexer(&script);
+        yy::parser parser(lexer, *this, false);
+
+        parser();
 
         return true;
     }

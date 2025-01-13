@@ -17,12 +17,12 @@ class Interpreter : public ParserOutput, StatementVisitor {
         void visit(const Pipeline *pipeline) override;
     };
     void interpret(std::vector<std::unique_ptr<Statement>> statements) override;
-    static void runSimpleCommandStartPipe(const SimpleCommand *com, int fds1[]);
-    static void runSimpleCommandPipe(const SimpleCommand *com, int fds1[], int fds2[]);
-    static void runSimpleCommandEndPipe(const SimpleCommand *com, int fds1[]);
+    void runSimpleCommandStartPipe(const SimpleCommand *com, int fds1[]);
+    void runSimpleCommandPipe(const SimpleCommand *com, int fds1[], int fds2[]);
+    void runSimpleCommandEndPipe(const SimpleCommand *com, int fds1[]);
     static std::vector<const SimpleCommand *> convertPipeline(const Pipeline *pipeline);
     static void executeCommand(const SimpleCommand *com);
-    static bool executeBuiltinCommand(const SimpleCommand *com);
+    bool executeBuiltinCommand(const SimpleCommand *com);
 
     void visit(const SimpleCommand *simpleCommand) override;
     void visit(const Assignment *assignment) override;

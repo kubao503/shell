@@ -7,7 +7,7 @@ void prompt();
 int main() {
     Lexer lexer;
     Interpreter interpreter;
-    yy::parser parser(lexer, interpreter);
+    yy::parser parser(lexer, interpreter, true);
     prompt();
     return parser();
 }

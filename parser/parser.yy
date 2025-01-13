@@ -25,7 +25,7 @@
 
 %define api.value.type variant
 %lex-param {Lexer &lexer}
-%parse-param {Lexer &lexer} {ParserOutput &output}
+%parse-param {Lexer &lexer} {ParserOutput &output} {bool printPrompt}
 
 %header
 
@@ -90,8 +90,8 @@ io_redirect      : '<'       filename               { $$ = Redirection{$filename
                  ;
 filename         : WORD                      /* Apply rule 2 */
                  ;
-newline_list     :              '\n'                { prompt(); }
-                 | newline_list '\n'                { prompt(); }
+newline_list     :              '\n'                { if (printPrompt) prompt(); }
+                 | newline_list '\n'                { if (printPrompt) prompt(); }
                  ;
 linebreak        : newline_list
                  | /* empty */
