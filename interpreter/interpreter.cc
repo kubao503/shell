@@ -40,7 +40,10 @@ void Interpreter::visit(const SimpleCommand *simpleCommand) {
 
 void Interpreter::executeCommand(const SimpleCommand *com) {
     if (!com->redirections.empty()) {
-        redirectToFile(&com->redirections.at(0));
+        for (auto redirection : com->redirections)
+        {
+            redirectToFile(&redirection);
+        }
     }
     if (com->args.empty()) {
         execlp(com->name.c_str(), com->name.c_str(), NULL);
