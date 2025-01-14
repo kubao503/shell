@@ -24,3 +24,23 @@ cd build
 cd build
 ./tests/test
 ```
+
+## Running Python tests
+
+Python >= 3.10 and Docker is required
+
+Environment setup:
+
+```shell
+cd integration_tests
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Running tests:
+
+```shell
+cd integration_tests
+pytest
+```
