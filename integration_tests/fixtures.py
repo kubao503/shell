@@ -17,7 +17,7 @@ class TestContainer:
         return self.container.exec_run(*args, **kwargs)
 
     def run_uxsh(self, cmd: str):
-        return self.run(f'uxsh -c {cmd}')
+        return self.run(['uxsh', '-c', cmd])
 
     def read_file(self, path: str) -> bytes:
         bits, _ = self.container.get_archive(path)
