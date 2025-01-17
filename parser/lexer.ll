@@ -3,25 +3,26 @@
     #include "parser.hh"
 
     std::string unwrap(const char* text, size_t len);
+
+    #define DEBUG(text) (std::cout << text << ": " << yytext << "\n")
 %}
 
 %option c++ noyywrap
 
 %option yyclass="Lexer"
 
-id [^[:space:]()'|;<>]+
+id [^[:space:]()'\|;<>]
 
 %%
 
 \([^()]*\)          { return yy::parser::make_SUBSHELL(unwrap(yytext, yyleng)); }
-\'[^']*\'           { return yy::parser::make_WORD(unwrap(yytext, yyleng)); }
 \n                  { return '\n'; }
 \|                  { return '|'; }
 ;                   { return ';'; }
 \<                  { return '<'; }
 \>                  { return '>'; }
-{id}=[[:alnum:]]*   { return yy::parser::make_ASSIGNMENT_WORD(yytext); }
-{id}                { return yy::parser::make_WORD(yytext); }
+{id}+=[[:alnum:]]*  { return yy::parser::make_ASSIGNMENT_WORD(yytext); }
+({id}|'[^']*')+     { return yy::parser::make_WORD(yytext); }
 .                   ;
 
 %%
