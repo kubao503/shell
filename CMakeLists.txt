@@ -20,5 +20,6 @@ add_executable(
     ${PROJECT_NAME}
     main.cc
     interpreter/interpreter.cc
+    interpreter/printer.cc
 )
 target_link_libraries(${PROJECT_NAME} PRIVATE parser)
