@@ -3,6 +3,7 @@
 
 #include "ast.hh"
 #include "parser_output.hh"
+#include <unordered_map>
 
 class Interpreter : public ParserOutput, StatementVisitor {
     class PipelineConverter : public StatementVisitor {
@@ -16,6 +17,9 @@ class Interpreter : public ParserOutput, StatementVisitor {
         void visit(const SimpleCommand *simpleCommand) override;
         void visit(const Pipeline *pipeline) override;
     };
+    std::unordered_map<std::string, std::string> variables;
+    std::string getSymbol(const std::string& name);
+    void replaceDollarExpressions(std::string& text);
     void interpret(std::vector<std::unique_ptr<Statement>> statements) override;
     void runSimpleCommandStartPipe(const SimpleCommand *com, int fds1[]);
     void runSimpleCommandPipe(const SimpleCommand *com, int fds1[], int fds2[]);

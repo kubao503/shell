@@ -32,10 +32,14 @@ void Interpreter::redirectToFile(const Redirection *redirection) {
 }
 
 void Interpreter::visit(const SimpleCommand *simpleCommand) {
-    if (executeBuiltinCommand(simpleCommand))
+    auto *transformedCommand = new SimpleCommand(*simpleCommand);
+    for(auto & arg : transformedCommand->args) {
+        replaceDollarExpressions(arg);
+    }
+    if (executeBuiltinCommand(transformedCommand))
         return;
     if (fork() == 0) {
-        executeCommand(simpleCommand);
+        executeCommand(transformedCommand);
     }
 
     wait(nullptr);
@@ -161,6 +165,7 @@ void Interpreter::runSimpleCommandPipe(const SimpleCommand *com, int fds1[], int
 }
 
 void Interpreter::visit(const Assignment *assignment) {
+    variables.insert(std::make_pair(assignment->var, assignment->value));
 }
 void Interpreter::visit(const Subshell *subshell) {
 }
@@ -168,6 +173,36 @@ std::vector<const SimpleCommand *> Interpreter::convertPipeline(const Pipeline *
     std::unique_ptr<PipelineConverter> pipelineSerializer = std::make_unique<PipelineConverter>();
     pipeline->accept(pipelineSerializer.get());
     return pipelineSerializer->getResult();
+}
+std::string Interpreter::getSymbol(const std::string& name) {
+    try {
+        return variables.at(name);
+    } catch(std::out_of_range& e) {
+        auto envValue = getenv(name.c_str());
+        if(envValue == nullptr) return "";
+        return getenv(name.c_str());
+    }
+}
+void Interpreter::replaceDollarExpressions(std::string &text) {
+    std::string varName;
+    int dollarExpressionStart = -1;
+    for(int i = 0; i < text.length(); i++) {
+        if(dollarExpressionStart != -1) {
+            if(isalnum(text.at(i))) {
+                varName += text.at(i);
+            } else {
+                text.replace(dollarExpressionStart, i - dollarExpressionStart + 1, getSymbol(varName));
+                dollarExpressionStart = -1;
+                varName = "";
+            }
+        }
+        if(text.at(i) == '$') {
+            dollarExpressionStart = i;
+        }
+    }
+    if(dollarExpressionStart != -1) {
+        text.replace(dollarExpressionStart, text.length(), getSymbol(varName));
+    }
 }
 void Interpreter::PipelineConverter::visit(const SimpleCommand *simpleCommand) {
     result.push_back(simpleCommand);
