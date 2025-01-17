@@ -1,5 +1,4 @@
 #include "interpreter/interpreter.hh"
-#include "interpreter/printer.hh"
 #include "parser.hh"
 #include "parser/lexer.hh"
 #include <sstream>
