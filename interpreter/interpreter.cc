@@ -7,6 +7,7 @@
 #include <fstream>
 #include <iostream>
 #include <sys/wait.h>
+#include <algorithm>
 
 void Interpreter::interpret(std::vector<std::unique_ptr<Statement>> statements) {
     for (const auto &statement: statements)
@@ -33,8 +34,9 @@ void Interpreter::redirectToFile(const Redirection *redirection) {
 
 void Interpreter::visit(const SimpleCommand *simpleCommand) {
     auto *transformedCommand = new SimpleCommand(*simpleCommand);
+    performWordExpansions(transformedCommand->name);
     for(auto & arg : transformedCommand->args) {
-        replaceDollarExpressions(arg);
+        performWordExpansions(arg);
     }
     if (executeBuiltinCommand(transformedCommand))
         return;
@@ -183,26 +185,26 @@ std::string Interpreter::getSymbol(const std::string& name) {
         return getenv(name.c_str());
     }
 }
-void Interpreter::replaceDollarExpressions(std::string &text) {
+void Interpreter::performWordExpansions(std::string &text) {
+    bool inQuote = false;
     std::string varName;
     int dollarExpressionStart = -1;
     for(int i = 0; i < text.length(); i++) {
+        if(text.at(i) == '\'') inQuote = !inQuote;
         if(dollarExpressionStart != -1) {
-            if(isalnum(text.at(i))) {
-                varName += text.at(i);
-            } else {
+            if(isalnum(text.at(i))) varName += text.at(i);
+            else {
                 text.replace(dollarExpressionStart, i - dollarExpressionStart + 1, getSymbol(varName));
                 dollarExpressionStart = -1;
                 varName = "";
             }
         }
-        if(text.at(i) == '$') {
-            dollarExpressionStart = i;
-        }
+        if(text.at(i) == '$' && !inQuote) dollarExpressionStart = i;
     }
     if(dollarExpressionStart != -1) {
         text.replace(dollarExpressionStart, text.length(), getSymbol(varName));
     }
+    text.erase(std::remove(text.begin(), text.end(), '\''), text.end());
 }
 void Interpreter::PipelineConverter::visit(const SimpleCommand *simpleCommand) {
     result.push_back(simpleCommand);

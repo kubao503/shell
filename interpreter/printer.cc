@@ -9,6 +9,7 @@ void Printer::interpret(std::vector<std::unique_ptr<Statement>> statements) {
 
 void Printer::visit(const SimpleCommand *com) {
     std::cout << "SimpleCommand: " << com->name;
+    std::cout << " (" << com->args.size() << " args)";
     if (!com->args.empty())
         std::cout << " Args:";
     for (auto arg: com->args)
