@@ -94,6 +94,9 @@ bool Interpreter::executeBuiltinCommand(const SimpleCommand *com) {
         parser();
 
         return true;
+    } else if (com->name == "export") {
+        if (com->args.size() != 1) throw std::runtime_error("Expected var name");
+        setenv(com->args[0].c_str(), getSymbol(com->args[0]).c_str(), true);
     }
     return false;
 }
