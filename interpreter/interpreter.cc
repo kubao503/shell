@@ -166,7 +166,7 @@ void Interpreter::runSimpleCommandPipe(const SimpleCommand *com, int fds1[], int
 }
 
 void Interpreter::visit(const Assignment *assignment) {
-    variables.insert(std::make_pair(assignment->var, assignment->value));
+    variables[assignment->var] = assignment->value;
 }
 void Interpreter::visit(const Subshell *subshell) {
     if (fork() == 0) {
