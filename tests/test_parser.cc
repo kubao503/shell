@@ -8,8 +8,12 @@
 class TestOutput : public ParserOutput {
 public:
     std::vector<std::unique_ptr<Statement>> statements_;
+
     void interpret(std::vector<std::unique_ptr<Statement>> statements) {
-        statements_ = std::move(statements);
+        statements_.insert(
+                statements_.end(),
+                std::make_move_iterator(statements.begin()),
+                std::make_move_iterator(statements.end()));
     }
 };
 
@@ -26,22 +30,30 @@ protected:
     std::unique_ptr<yy::parser> parser_;
 };
 
-TEST_F(ParserTest, parse_success) {
-    Init("prog arg <in >out\n");
+TEST_F(ParserTest, parse_simple_command) {
+    Init("prog");
     ASSERT_FALSE((*parser_)());
     ASSERT_EQ(output_.statements_.size(), 1);
 
     const auto *simpleCommand = dynamic_cast<const SimpleCommand *>(output_.statements_.at(0).get());
     ASSERT_TRUE(simpleCommand);
-
     EXPECT_EQ(simpleCommand->name, "prog");
-    ASSERT_EQ(simpleCommand->args.size(), 1);
-    EXPECT_EQ(simpleCommand->args.at(0), "arg");
-    ASSERT_EQ(simpleCommand->redirections.size(), 2);
-    EXPECT_EQ(simpleCommand->redirections.at(0).file, "in");
-    EXPECT_EQ(simpleCommand->redirections.at(0).type, RedirectionType::IN);
-    EXPECT_EQ(simpleCommand->redirections.at(1).file, "out");
-    EXPECT_EQ(simpleCommand->redirections.at(1).type, RedirectionType::OUT);
+    EXPECT_EQ(simpleCommand->args.size(), 0);
+    EXPECT_EQ(simpleCommand->redirections.size(), 0);
+}
+
+TEST_F(ParserTest, parse_two_commands) {
+    Init("prog1\nprog2");
+    ASSERT_FALSE((*parser_)());
+    ASSERT_EQ(output_.statements_.size(), 2);
+
+    const auto *firstCommand = dynamic_cast<const SimpleCommand *>(output_.statements_.at(0).get());
+    ASSERT_TRUE(firstCommand);
+    EXPECT_EQ(firstCommand->name, "prog1");
+
+    const auto *secondCommand = dynamic_cast<const SimpleCommand *>(output_.statements_.at(1).get());
+    ASSERT_TRUE(secondCommand);
+    EXPECT_EQ(secondCommand->name, "prog2");
 }
 
 TEST_F(ParserTest, syntax_error) {
@@ -84,4 +96,20 @@ TEST_F(ParserTest, quotes) {
     const auto *simpleCommand = dynamic_cast<const SimpleCommand *>(output_.statements_.at(0).get());
     ASSERT_TRUE(simpleCommand);
     EXPECT_EQ(simpleCommand->name, "echo 1");
+}
+
+TEST_F(ParserTest, parse_redirection) {
+    Init("prog <in>out");
+    ASSERT_FALSE((*parser_)());
+    ASSERT_EQ(output_.statements_.size(), 1);
+
+    const auto *simpleCommand = dynamic_cast<const SimpleCommand *>(output_.statements_.at(0).get());
+    ASSERT_TRUE(simpleCommand);
+
+    EXPECT_EQ(simpleCommand->args.size(), 0);
+    ASSERT_EQ(simpleCommand->redirections.size(), 2);
+    EXPECT_EQ(simpleCommand->redirections.at(0).file, "in");
+    EXPECT_EQ(simpleCommand->redirections.at(0).type, RedirectionType::IN);
+    EXPECT_EQ(simpleCommand->redirections.at(1).file, "out");
+    EXPECT_EQ(simpleCommand->redirections.at(1).type, RedirectionType::OUT);
 }

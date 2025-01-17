@@ -9,7 +9,7 @@
 
 %option yyclass="Lexer"
 
-id [^[:space:]]+
+id [^[:space:]()'|;<>]+
 
 %%
 
