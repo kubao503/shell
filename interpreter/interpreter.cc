@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <sys/wait.h>
 
 void Interpreter::interpret(std::vector<std::unique_ptr<Statement>> statements) {
@@ -163,6 +164,17 @@ void Interpreter::runSimpleCommandPipe(const SimpleCommand *com, int fds1[], int
 void Interpreter::visit(const Assignment *assignment) {
 }
 void Interpreter::visit(const Subshell *subshell) {
+    if (fork() == 0) {
+        for(const auto& red : subshell->redirections) {
+            redirectToFile(&red);
+        }
+        std::istringstream inputStream(subshell->cmds);
+        Lexer lexer(&inputStream);
+        yy::parser parser(lexer, *this, false);
+        parser();
+    }
+
+    wait(nullptr);
 }
 std::vector<const SimpleCommand *> Interpreter::convertPipeline(const Pipeline *pipeline) {
     std::unique_ptr<PipelineConverter> pipelineSerializer = std::make_unique<PipelineConverter>();
