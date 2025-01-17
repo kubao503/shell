@@ -34,15 +34,15 @@ void Interpreter::redirectToFile(const Redirection *redirection) {
 }
 
 void Interpreter::visit(const SimpleCommand *simpleCommand) {
-    auto *transformedCommand = new SimpleCommand(*simpleCommand);
+    std::unique_ptr<SimpleCommand> transformedCommand = std::make_unique<SimpleCommand>(*simpleCommand);
     performWordExpansions(transformedCommand->name);
     for(auto & arg : transformedCommand->args) {
         performWordExpansions(arg);
     }
-    if (executeBuiltinCommand(transformedCommand))
+    if (executeBuiltinCommand(transformedCommand.get()))
         return;
     if (fork() == 0) {
-        executeCommand(transformedCommand);
+        executeCommand(transformedCommand.get());
     }
 
     wait(nullptr);
@@ -101,22 +101,31 @@ bool Interpreter::executeBuiltinCommand(const SimpleCommand *com) {
 
 void Interpreter::visit(const Pipeline *pipeline) {
     std::vector<const SimpleCommand *> commands = convertPipeline(pipeline);
+    std::vector<std::unique_ptr<SimpleCommand>> transformedCommands;
+    for(const auto command : commands) {
+        auto transformedCommand = std::make_unique<SimpleCommand>(*command);
+        performWordExpansions(transformedCommand->name);
+        for(auto & arg : transformedCommand->args) {
+            performWordExpansions(arg);
+        }
+        transformedCommands.push_back(std::move(transformedCommand));
+    }
 
     int fds1[2];
 
-    for (size_t i = 0; i < commands.size(); i++) {
+    for (size_t i = 0; i < transformedCommands.size(); i++) {
         if (i == 0) {
             pipe(fds1);
-            runSimpleCommandStartPipe(commands.at(i), fds1);
+            runSimpleCommandStartPipe(transformedCommands.at(i).get(), fds1);
         } else if (i == commands.size() - 1) {
-            runSimpleCommandEndPipe(commands.at(i), fds1);
+            runSimpleCommandEndPipe(transformedCommands.at(i).get(), fds1);
             close(fds1[0]);
             close(fds1[1]);
         } else {
             int fds2[2];
 
             pipe(fds2);
-            runSimpleCommandPipe(commands.at(i), fds1, fds2);
+            runSimpleCommandPipe(transformedCommands.at(i).get(), fds1, fds2);
             close(fds1[0]);
             close(fds1[1]);
             fds1[0] = fds2[0];
