@@ -48,7 +48,7 @@ void Interpreter::visit(const SimpleCommand *simpleCommand) {
 
 void Interpreter::executeCommand(const SimpleCommand *com) {
     if (!com->redirections.empty()) {
-        for (auto redirection: com->redirections) {
+        for (const auto& redirection: com->redirections) {
             redirectToFile(&redirection);
         }
     }
@@ -75,7 +75,7 @@ bool Interpreter::executeBuiltinCommand(const SimpleCommand *com) {
         char buf[4096];
         auto absPath = getcwd(buf, sizeof(buf));
         if (!absPath)
-            std::runtime_error("getcwd failed");
+            throw std::runtime_error("getcwd failed");
         if (setenv("PWD", absPath, true))
             throw std::runtime_error("PWD failed with error code: " + std::to_string(errno));
 

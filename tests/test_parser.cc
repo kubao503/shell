@@ -9,7 +9,7 @@ class TestOutput : public ParserOutput {
 public:
     std::vector<std::unique_ptr<Statement>> statements_;
 
-    void interpret(std::vector<std::unique_ptr<Statement>> statements) {
+    void interpret(std::vector<std::unique_ptr<Statement>> statements) override {
         statements_.insert(
                 statements_.end(),
                 std::make_move_iterator(statements.begin()),
