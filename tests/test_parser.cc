@@ -15,6 +15,7 @@ public:
                 std::make_move_iterator(statements.begin()),
                 std::make_move_iterator(statements.end()));
     }
+    void prompt() override {}
 };
 
 class ParserTest : public testing::Test {
@@ -89,13 +90,14 @@ TEST(AstTest, assignment_ctor_empty) {
 }
 
 TEST_F(ParserTest, quotes) {
-    Init("'echo 1'");
+    Init("echo 'a   b'");
     ASSERT_FALSE((*parser_)());
     ASSERT_EQ(output_.statements_.size(), 1);
 
     const auto *simpleCommand = dynamic_cast<const SimpleCommand *>(output_.statements_.at(0).get());
     ASSERT_TRUE(simpleCommand);
-    EXPECT_EQ(simpleCommand->name, "echo 1");
+    ASSERT_EQ(simpleCommand->args.size(), 1);
+    EXPECT_EQ(simpleCommand->args.at(0), "'a   b'");
 }
 
 TEST_F(ParserTest, parse_redirection) {
