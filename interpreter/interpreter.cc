@@ -2,6 +2,7 @@
 
 #include "ast.hh"
 #include "lexer.hh"
+#include "util.h"
 
 #include <fcntl.h>
 #include <fstream>
@@ -9,6 +10,9 @@
 #include <sstream>
 #include <sys/wait.h>
 #include <algorithm>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 void Interpreter::interpret(std::vector<std::unique_ptr<Statement>> statements) {
     for (const auto &statement: statements)
@@ -231,6 +235,16 @@ void Interpreter::transformCommand(SimpleCommand &com) {
     for(auto &arg : com.args) {
         performWordExpansions(arg);
     }
+}
+void Interpreter::prompt() {
+    std::cout << getSymbol("USER") << ":" << shortPwd() << "$ ";
+}
+std::string Interpreter::shortPwd() {
+    fs::path pwd(getSymbol("PWD"));
+    fs::path home(getSymbol("HOME"));
+    if(!isSubDir(pwd, home)) return pwd.string();
+    if(pwd == home) return "~";
+    return "~/" + fs::relative(pwd, home).string();
 }
 void Interpreter::PipelineConverter::visit(const SimpleCommand *simpleCommand) {
     result.push_back(simpleCommand);

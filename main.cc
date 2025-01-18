@@ -22,6 +22,6 @@ int main(int argc, char* argv[]) {
     Lexer lexer;
     Interpreter interpreter;
     yy::parser parser(lexer, interpreter, true);
-    prompt();
+    interpreter.prompt();
     return parser();
 }

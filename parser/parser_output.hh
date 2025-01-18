@@ -10,6 +10,7 @@ class ParserOutput
 {
 public:
     virtual void interpret(std::vector<std::unique_ptr<Statement>> statements) = 0;
+    virtual void prompt() = 0;
 };
 
 #endif

@@ -90,8 +90,8 @@ io_redirect      : '<'       filename               { $$ = Redirection{$filename
                  ;
 filename         : WORD                      /* Apply rule 2 */
                  ;
-newline_list     :              '\n'                { if (printPrompt) prompt(); }
-                 | newline_list '\n'                { if (printPrompt) prompt(); }
+newline_list     :              '\n'                { if (printPrompt) output.prompt(); }
+                 | newline_list '\n'                { if (printPrompt) output.prompt(); }
                  ;
 linebreak        : newline_list
                  | /* empty */
@@ -108,9 +108,4 @@ pipeline_linebreak        : pipeline_newline_list
 void yy::parser::error(const std::string &message)
 {
     std::cerr << "Error: " << message << std::endl;
-}
-
-void prompt()
-{
-    std::cout << "> ";
 }
