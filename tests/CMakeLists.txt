@@ -3,6 +3,9 @@ enable_testing()
 add_executable(
     test
     test_parser.cc
+    test_word_expansion.cc
+    ../interpreter/interpreter.cc
+    ../interpreter/util.cc
 )
 
 target_link_libraries(

@@ -20,10 +20,10 @@ class Interpreter : public ParserOutput, StatementVisitor {
 public:
     void interpret(std::vector<std::unique_ptr<Statement>> statements) override;
     void prompt() override;
+    void performWordExpansions(std::string& text);
 private:
     std::unordered_map<std::string, std::string> variables;
     std::string getSymbol(const std::string& name);
-    void performWordExpansions(std::string& text);
 
     void runSimpleCommandStartPipe(const SimpleCommand *com, int fds1[]);
     void runSimpleCommandPipe(const SimpleCommand *com, int fds1[], int fds2[]);

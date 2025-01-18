@@ -211,24 +211,30 @@ std::string Interpreter::getSymbol(const std::string& name) {
 }
 void Interpreter::performWordExpansions(std::string &text) {
     bool inQuote = false;
+    bool inDollarExpression = false;
     std::string varName;
-    int dollarExpressionStart = -1;
-
-    for(int i = 0; i < text.length(); i++) {
-        if(text.at(i) == '\'') inQuote = !inQuote;
-        if(dollarExpressionStart != -1) {
-            if(isalnum(text.at(i))) varName += text.at(i);
+    std::string newText;
+    int i = 0;
+    while(i < text.length()) {
+        char c = text.at(i);
+        if(inDollarExpression) {
+            if(isalnum(c)) {varName += c; i++;}
             else {
-                text.replace(dollarExpressionStart, i - dollarExpressionStart + 1, getSymbol(varName));
-                dollarExpressionStart = -1;
+                newText += getSymbol(varName);
+                inDollarExpression = false;
                 varName = "";
             }
+            continue;
         }
-        if(text.at(i) == '$' && !inQuote) dollarExpressionStart = i;
+        if(c == '\'') inQuote = !inQuote;
+        if(c == '$' && !inQuote) inDollarExpression = true;
+        else newText += c;
+        i++;
     }
-    if(dollarExpressionStart != -1) {
-        text.replace(dollarExpressionStart, text.length(), getSymbol(varName));
+    if(inDollarExpression) {
+        newText += getSymbol(varName);
     }
+    text = newText;
     text.erase(std::remove(text.begin(), text.end(), '\''), text.end());
 }
 void Interpreter::transformCommand(SimpleCommand &com) {
