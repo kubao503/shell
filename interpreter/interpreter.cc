@@ -197,13 +197,13 @@ std::vector<const SimpleCommand *> Interpreter::convertPipeline(const Pipeline *
     return pipelineSerializer->getResult();
 }
 std::string Interpreter::getSymbol(const std::string& name) {
-    try {
-        return variables.at(name);
-    } catch(std::out_of_range& e) {
+    auto varValue = variables.find(name);
+    if(varValue == variables.end()) {
         auto envValue = getenv(name.c_str());
         if(envValue == nullptr) return "";
         return getenv(name.c_str());
     }
+    return varValue->second;
 }
 void Interpreter::performWordExpansions(std::string &text) {
     bool inQuote = false;
