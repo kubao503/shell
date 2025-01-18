@@ -173,7 +173,9 @@ void Interpreter::runSimpleCommandPipe(const SimpleCommand *com, int fds1[], int
 }
 
 void Interpreter::visit(const Assignment *assignment) {
-    variables[assignment->var] = assignment->value;
+    Assignment transformedAssignment(*assignment);
+    performWordExpansions(transformedAssignment.value);
+    variables[transformedAssignment.var] = transformedAssignment.value;
 }
 void Interpreter::visit(const Subshell *subshell) {
 }
