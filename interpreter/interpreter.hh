@@ -32,6 +32,7 @@ class Interpreter : public ParserOutput, StatementVisitor {
     void visit(const Pipeline *pipeline) override;
     void visit(const Subshell *subshell) override;
     static void redirectToFile(const Redirection *redirection);
+    void transformCommand(SimpleCommand& com);
 };
 
 #endif
