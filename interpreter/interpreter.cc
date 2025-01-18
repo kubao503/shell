@@ -70,9 +70,9 @@ void Interpreter::executeCommand(const SimpleCommand *com) {
 
 bool Interpreter::executeBuiltinCommand(const SimpleCommand *com) {
     if (com->name == "cd") {
-        if (com->args.size() != 1)
-            throw std::runtime_error("Expected one argument");
-        auto path = com->args.at(0).c_str();
+        if (com->args.size() > 1)
+            throw std::runtime_error("Expected no more than one argument");
+        auto path = com->args.empty() ? getenv("HOME") : com->args.at(0).c_str();
         if (chdir(path))
             throw std::runtime_error("cd failed with error code: " + std::to_string(errno));
         char buf[4096];
@@ -213,6 +213,7 @@ void Interpreter::performWordExpansions(std::string &text) {
     bool inQuote = false;
     std::string varName;
     int dollarExpressionStart = -1;
+
     for(int i = 0; i < text.length(); i++) {
         if(text.at(i) == '\'') inQuote = !inQuote;
         if(dollarExpressionStart != -1) {

@@ -12,11 +12,11 @@ void Printer::visit(const SimpleCommand *com) {
     std::cout << " (" << com->args.size() << " args)";
     if (!com->args.empty())
         std::cout << " Args:";
-    for (auto arg: com->args)
+    for (const auto& arg: com->args)
         std::cout << ' ' << arg;
     if (!com->redirections.empty())
         std::cout << " Red:";
-    for (auto red: com->redirections)
+    for (const auto& red: com->redirections)
         std::cout << ' ' << red.file;
     std::cout << '\n';
 }
