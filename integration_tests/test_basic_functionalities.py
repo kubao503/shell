@@ -6,9 +6,9 @@ def test_hello(shell_container: TestContainer):
     assert result.output.decode("utf-8") == 'hello\n'
 
 def test_file(shell_container: TestContainer):
-    result = shell_container.run_uxsh(r'echo hello > /hello.txt')
+    result = shell_container.run_uxsh(r'echo hello > /file.txt')
     assert result.exit_code == 0
-    assert shell_container.read_file('/hello.txt') == b'hello\n'
+    assert shell_container.read_file('/file.txt') == b'hello\n'
 
 def test_multiple_arguments(shell_container: TestContainer):
     result = shell_container.run_uxsh(r'echo -e apple\napple\nBanana\napple | grep banana -i -n')
@@ -47,4 +47,3 @@ def test_multiple_redirections_in_out(shell_container: TestContainer):
     assert shell_container.read_file('grep_result.txt') == b'plum\n'
     assert shell_container.read_file('file.txt') == b''
     assert shell_container.read_file('file2.txt') == b'orange\nplum\n'
-
