@@ -57,6 +57,7 @@ void Interpreter::executeCommand(const SimpleCommand *com) {
     }
     if (com->args.empty()) {
         execlp(com->name.c_str(), com->name.c_str(), NULL);
+        exit(-1);
     } else {
         std::vector<const char *> args;
         args.push_back(com->name.c_str());
@@ -65,6 +66,7 @@ void Interpreter::executeCommand(const SimpleCommand *com) {
         }
         args.push_back(nullptr);
         execvp(com->name.c_str(), const_cast<char *const *>(args.data()));
+        exit(-1);
     }
 }
 
