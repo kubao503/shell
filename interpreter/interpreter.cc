@@ -305,7 +305,7 @@ void Interpreter::PipelineExecutor::visit(const SimpleCommand *simpleCommand) {
 }
 
 void Interpreter::PipelineExecutor::visit(const Pipeline *pipeline) {
-    std::runtime_error("Nested pipeline. That should not be possible after flattening");
+    throw std::runtime_error("Nested pipeline. That should not be possible after flattening");
 }
 
 void Interpreter::PipelineExecutor::visit(const Assignment *assignment) {
