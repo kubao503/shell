@@ -17,13 +17,15 @@ class Interpreter : public ParserOutput, StatementVisitor {
         void visit(const SimpleCommand *simpleCommand) override;
         void visit(const Pipeline *pipeline) override;
     };
+
 public:
     void interpret(std::vector<std::unique_ptr<Statement>> statements) override;
     void prompt() override;
-    void performWordExpansions(std::string& text);
+    std::string performWordExpansions(const std::string &text);
+
 private:
     std::unordered_map<std::string, std::string> variables;
-    std::string getSymbol(const std::string& name);
+    std::string getSymbol(const std::string &name);
 
     void runSimpleCommandStartPipe(const SimpleCommand *com, int fds1[]);
     void runSimpleCommandPipe(const SimpleCommand *com, int fds1[], int fds2[]);
@@ -36,7 +38,7 @@ private:
     void visit(const Pipeline *pipeline) override;
     void visit(const Subshell *subshell) override;
     static void redirectToFile(const Redirection *redirection);
-    void transformCommand(SimpleCommand& com);
+    void transformCommand(SimpleCommand &com);
     std::string shortPwd();
 };
 

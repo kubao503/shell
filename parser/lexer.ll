@@ -11,7 +11,8 @@
 
 %option yyclass="Lexer"
 
-id [^[:space:]()'\|;<>]
+id      [^[:space:]()'\|;<>]
+expr    ({id}|'[^']*')
 
 %%
 
@@ -21,8 +22,8 @@ id [^[:space:]()'\|;<>]
 ;                   { return ';'; }
 \<                  { return '<'; }
 \>                  { return '>'; }
-{id}+=[[:alnum:]]*  { return yy::parser::make_ASSIGNMENT_WORD(yytext); }
-({id}|'[^']*')+     { return yy::parser::make_WORD(yytext); }
+{id}+={expr}*       { return yy::parser::make_ASSIGNMENT_WORD(yytext); }
+{expr}+             { return yy::parser::make_WORD(yytext); }
 .                   ;
 
 %%

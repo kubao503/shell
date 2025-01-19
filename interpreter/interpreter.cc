@@ -4,13 +4,13 @@
 #include "lexer.hh"
 #include "util.h"
 
+#include <algorithm>
 #include <fcntl.h>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <sys/wait.h>
-#include <algorithm>
-#include <filesystem>
 
 namespace fs = std::filesystem;
 
@@ -51,7 +51,7 @@ void Interpreter::visit(const SimpleCommand *simpleCommand) {
 
 void Interpreter::executeCommand(const SimpleCommand *com) {
     if (!com->redirections.empty()) {
-        for (const auto& redirection: com->redirections) {
+        for (const auto &redirection: com->redirections) {
             redirectToFile(&redirection);
         }
     }
@@ -106,7 +106,7 @@ bool Interpreter::executeBuiltinCommand(const SimpleCommand *com) {
 void Interpreter::visit(const Pipeline *pipeline) {
     std::vector<const SimpleCommand *> commands = convertPipeline(pipeline);
     std::vector<SimpleCommand> transformedCommands;
-    for(const auto command : commands) {
+    for (const auto command: commands) {
         SimpleCommand transformedCommand(*command);
         transformCommand(transformedCommand);
         transformedCommands.push_back(std::move(transformedCommand));
@@ -178,13 +178,13 @@ void Interpreter::runSimpleCommandPipe(const SimpleCommand *com, int fds1[], int
 }
 
 void Interpreter::visit(const Assignment *assignment) {
-    Assignment transformedAssignment(*assignment);
-    performWordExpansions(transformedAssignment.value);
-    variables[transformedAssignment.var] = transformedAssignment.value;
+    const auto transformedValue = performWordExpansions(assignment->value);
+    variables[assignment->var] = transformedValue;
 }
+
 void Interpreter::visit(const Subshell *subshell) {
     if (fork() == 0) {
-        for(const auto& red : subshell->redirections) {
+        for (const auto &red: subshell->redirections) {
             redirectToFile(&red);
         }
         std::istringstream inputStream(subshell->cmds);
@@ -200,47 +200,48 @@ std::vector<const SimpleCommand *> Interpreter::convertPipeline(const Pipeline *
     pipeline->accept(pipelineSerializer.get());
     return pipelineSerializer->getResult();
 }
-std::string Interpreter::getSymbol(const std::string& name) {
+std::string Interpreter::getSymbol(const std::string &name) {
     auto varValue = variables.find(name);
-    if(varValue == variables.end()) {
+    if (varValue == variables.end()) {
         auto envValue = getenv(name.c_str());
-        if(envValue == nullptr) return "";
+        if (envValue == nullptr) return "";
         return getenv(name.c_str());
     }
     return varValue->second;
 }
-void Interpreter::performWordExpansions(std::string &text) {
+std::string Interpreter::performWordExpansions(const std::string &text) {
     bool inQuote = false;
-    bool inDollarExpression = false;
-    std::string varName;
+    auto dollarExpressionStart = text.end();
     std::string newText;
-    int i = 0;
-    while(i < text.length()) {
-        char c = text.at(i);
-        if(inDollarExpression) {
-            if(isalnum(c)) {varName += c; i++;}
-            else {
-                newText += getSymbol(varName);
-                inDollarExpression = false;
-                varName = "";
+
+    for (auto it = text.begin(); it != text.end(); ++it) {
+        if (dollarExpressionStart != text.end()) {
+            if (isalnum(*it)) {
+                continue;
+            } else {
+                newText += getSymbol(std::string(dollarExpressionStart, it));
+                dollarExpressionStart = text.end();
             }
-            continue;
         }
-        if(c == '\'') inQuote = !inQuote;
-        if(c == '$' && !inQuote) inDollarExpression = true;
-        else newText += c;
-        i++;
+        if (*it == '\'')
+            inQuote = !inQuote;
+        else if (*it == '$' && !inQuote)
+            dollarExpressionStart = it + 1;
+        else
+            newText += *it;
     }
-    if(inDollarExpression) {
-        newText += getSymbol(varName);
-    }
-    text = newText;
-    text.erase(std::remove(text.begin(), text.end(), '\''), text.end());
+
+    if (dollarExpressionStart != text.end())
+        newText += getSymbol(std::string(dollarExpressionStart, text.end()));
+    if (inQuote)
+        throw std::runtime_error("Unmatched quote: " + text);
+
+    return newText;
 }
 void Interpreter::transformCommand(SimpleCommand &com) {
-    performWordExpansions(com.name);
-    for(auto &arg : com.args) {
-        performWordExpansions(arg);
+    com.name = performWordExpansions(com.name);
+    for (auto &arg: com.args) {
+        arg = performWordExpansions(arg);
     }
 }
 void Interpreter::prompt() {
@@ -249,8 +250,8 @@ void Interpreter::prompt() {
 std::string Interpreter::shortPwd() {
     fs::path pwd(getSymbol("PWD"));
     fs::path home(getSymbol("HOME"));
-    if(!isSubDir(pwd, home)) return pwd.string();
-    if(pwd == home) return "~";
+    if (!isSubDir(pwd, home)) return pwd.string();
+    if (pwd == home) return "~";
     return "~/" + fs::relative(pwd, home).string();
 }
 void Interpreter::PipelineConverter::visit(const SimpleCommand *simpleCommand) {
