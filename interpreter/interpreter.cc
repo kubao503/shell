@@ -14,6 +14,7 @@
 
 namespace fs = std::filesystem;
 
+
 void Interpreter::interpret(std::vector<std::unique_ptr<Statement>> statements) {
     for (const auto &statement: statements)
         statement->accept(this);
@@ -40,8 +41,10 @@ void Interpreter::redirectToFile(const Redirection *redirection) {
 void Interpreter::visit(const SimpleCommand *simpleCommand) {
     SimpleCommand transformedCommand(*simpleCommand);
     transformCommand(transformedCommand);
-    if (executeBuiltinCommand(&transformedCommand))
+    if (auto builtInCom = getBuiltinCommand(simpleCommand)) {
+        (*builtInCom)(*this, simpleCommand);
         return;
+    }
     if (fork() == 0) {
         executeCommand(&transformedCommand);
     }
@@ -70,39 +73,11 @@ void Interpreter::executeCommand(const SimpleCommand *com) {
     }
 }
 
-bool Interpreter::executeBuiltinCommand(const SimpleCommand *com) {
-    if (com->name == "cd") {
-        if (com->args.size() > 1)
-            throw std::runtime_error("Expected no more than one argument");
-        auto path = com->args.empty() ? getenv("HOME") : com->args.at(0).c_str();
-        if (chdir(path))
-            throw std::runtime_error("cd failed with error code: " + std::to_string(errno));
-        char buf[4096];
-        auto absPath = getcwd(buf, sizeof(buf));
-        if (!absPath)
-            throw std::runtime_error("getcwd failed");
-        if (setenv("PWD", absPath, true))
-            throw std::runtime_error("PWD failed with error code: " + std::to_string(errno));
-
-        return true;
-    } else if (com->name == ".") {
-        if (com->args.size() != 1)
-            throw std::runtime_error("Expected file name");
-        const auto &fileName = com->args.at(0);
-        std::ifstream script(fileName);
-        if (!script)
-            throw std::runtime_error("Error: Could not open file " + fileName);
-        Lexer lexer(&script);
-        yy::parser parser(lexer, *this, false);
-
-        parser();
-
-        return true;
-    } else if (com->name == "export") {
-        if (com->args.size() != 1) throw std::runtime_error("Expected var name");
-        setenv(com->args[0].c_str(), getSymbol(com->args[0]).c_str(), true);
-    }
-    return false;
+std::optional<Interpreter::BuiltInCommand> Interpreter::getBuiltinCommand(const SimpleCommand *com) {
+    auto res = std::find_if(builtInCommands.begin(), builtInCommands.end(), [&](const auto &pair) { return pair.first == com->name; });
+    if (res != builtInCommands.end())
+        return res->second;
+    return std::nullopt;
 }
 
 void Interpreter::visit(const Pipeline *pipeline) {
@@ -146,8 +121,10 @@ void Interpreter::runSimpleCommandStartPipe(const SimpleCommand *com, int fds1[]
         dup2(fds1[1], 1);
         close(fds1[1]);
         close(fds1[0]);
-        if (executeBuiltinCommand(com))
+        if (auto builtInCom = getBuiltinCommand(com)) {
+            (*builtInCom)(*this, com);
             exit(0);
+        }
         executeCommand(com);
     }
 
@@ -159,8 +136,10 @@ void Interpreter::runSimpleCommandEndPipe(const SimpleCommand *com, int fds1[]) 
         dup2(fds1[0], 0);
         close(fds1[0]);
         close(fds1[1]);
-        if (executeBuiltinCommand(com))
+        if (auto builtInCom = getBuiltinCommand(com)) {
+            (*builtInCom)(*this, com);
             exit(0);
+        }
         executeCommand(com);
     }
 }
@@ -173,8 +152,10 @@ void Interpreter::runSimpleCommandPipe(const SimpleCommand *com, int fds1[], int
         dup2(fds2[1], 1);
         close(fds1[0]);
         close(fds2[1]);
-        if (executeBuiltinCommand(com))
+        if (auto builtInCom = getBuiltinCommand(com)) {
+            (*builtInCom)(*this, com);
             exit(0);
+        }
         executeCommand(com);
     }
 }
@@ -263,3 +244,42 @@ void Interpreter::PipelineConverter::visit(const Pipeline *pipeline) {
     pipeline->lhs->accept(this);
     pipeline->rhs->accept(this);
 }
+
+
+void Interpreter::changeDirectory(const SimpleCommand *com) {
+    if (com->args.size() > 1) throw std::runtime_error("Expected no more than one argument");
+    auto path = com->args.empty() ? getenv("HOME") : com->args.at(0).c_str();
+    if (chdir(path))
+        throw std::runtime_error("cd failed with error code: " + std::to_string(errno));
+    char buf[4096];
+    auto absPath = getcwd(buf, sizeof(buf));
+    if (!absPath)
+        throw std::runtime_error("getcwd failed");
+    if (setenv("PWD", absPath, true))
+        throw std::runtime_error("PWD failed with error code: " + std::to_string(errno));
+}
+
+
+void Interpreter::runScript(const SimpleCommand *com) {
+    if (com->args.size() != 1)
+        throw std::runtime_error("Expected file name");
+    const auto &fileName = com->args.at(0);
+    std::ifstream script(fileName);
+    if (!script)
+        throw std::runtime_error("Error: Could not open file " + fileName);
+    Lexer lexer(&script);
+    yy::parser parser(lexer, *this, false);
+
+    parser();
+}
+
+void Interpreter::exportVar(const SimpleCommand *com) {
+    if (com->args.size() != 1) throw std::runtime_error("Expected var name");
+    setenv(com->args[0].c_str(), getSymbol(com->args[0]).c_str(), true);
+}
+
+const std::initializer_list<std::pair<std::string, std::function<void(Interpreter &, const SimpleCommand *com)>>> Interpreter::builtInCommands{
+        {"cd", [](Interpreter &interpreter, auto com) { interpreter.changeDirectory(com); }},
+        {".", [](Interpreter &interpreter, auto com) { interpreter.runScript(com); }},
+        {"export", [](Interpreter &interpreter, auto com) { interpreter.exportVar(com); }},
+};
