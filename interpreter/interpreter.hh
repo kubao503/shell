@@ -12,14 +12,25 @@
 class Interpreter : public ParserOutput, StatementVisitor {
     class PipelineConverter : public StatementVisitor {
     private:
-        std::vector<const SimpleCommand *> result;
+        std::vector<const Statement *> result;
 
     public:
-        std::vector<const SimpleCommand *> getResult() { return result; }
-        void visit(const Subshell *subshell) override {};
-        void visit(const Assignment *assignment) override {};
+        auto getResult() { return result; }
+        void visit(const Subshell *subshell) override;
+        void visit(const Assignment *assignment) override;
         void visit(const SimpleCommand *simpleCommand) override;
         void visit(const Pipeline *pipeline) override;
+    };
+
+    struct PipelineExecutor : public StatementVisitor {
+        Interpreter *interpreter;
+
+        explicit PipelineExecutor(Interpreter *interpreter) : interpreter{interpreter} {}
+
+        void visit(const SimpleCommand *simpleCommand) override;
+        void visit(const Pipeline *pipeline) override;
+        void visit(const Assignment *assignment) override;
+        void visit(const Subshell *subshell) override;
     };
 
 public:
@@ -34,10 +45,10 @@ private:
 
     std::string getSymbol(const std::string &name);
 
-    void runSimpleCommandStartPipe(const SimpleCommand *com, int fds1[]);
-    void runSimpleCommandPipe(const SimpleCommand *com, int fds1[], int fds2[]);
-    void runSimpleCommandEndPipe(const SimpleCommand *com, int fds1[]);
-    static std::vector<const SimpleCommand *> convertPipeline(const Pipeline *pipeline);
+    void runStatementStartInPipe(const Statement *stmt, int fds1[]);
+    void runStatementInPipe(const Statement *stmt, int fds1[], int fds2[]);
+    void runStatementEndInPipe(const Statement *stmt, int fds1[]);
+    static auto convertPipeline(const Pipeline *pipeline);
     static void executeCommand(const SimpleCommand *com);
     std::optional<BuiltInCommand> getBuiltinCommand(const SimpleCommand *com);
     void visit(const SimpleCommand *simpleCommand) override;
@@ -45,7 +56,7 @@ private:
     void visit(const Pipeline *pipeline) override;
     void visit(const Subshell *subshell) override;
     static void redirectToFile(const Redirection *redirection);
-    void transformCommand(SimpleCommand &com);
+    SimpleCommand transformCommand(const SimpleCommand &com);
     std::string shortPwd();
 
     void changeDirectory(const SimpleCommand *com);

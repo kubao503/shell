@@ -39,14 +39,15 @@ void Interpreter::redirectToFile(const Redirection *redirection) {
 }
 
 void Interpreter::visit(const SimpleCommand *simpleCommand) {
-    SimpleCommand transformedCommand(*simpleCommand);
-    transformCommand(transformedCommand);
+    const auto transformedCommand = transformCommand(*simpleCommand);
+
     if (auto builtInCom = getBuiltinCommand(simpleCommand)) {
         (*builtInCom)(*this, simpleCommand);
         return;
     }
     if (fork() == 0) {
         executeCommand(&transformedCommand);
+        exit(-1);
     }
 
     wait(nullptr);
@@ -80,30 +81,30 @@ std::optional<Interpreter::BuiltInCommand> Interpreter::getBuiltinCommand(const 
     return std::nullopt;
 }
 
+auto Interpreter::convertPipeline(const Pipeline *pipeline) {
+    PipelineConverter pipelineSerializer;
+    pipeline->accept(&pipelineSerializer);
+    return pipelineSerializer.getResult();
+}
+
 void Interpreter::visit(const Pipeline *pipeline) {
-    std::vector<const SimpleCommand *> commands = convertPipeline(pipeline);
-    std::vector<SimpleCommand> transformedCommands;
-    for (const auto command: commands) {
-        SimpleCommand transformedCommand(*command);
-        transformCommand(transformedCommand);
-        transformedCommands.push_back(std::move(transformedCommand));
-    }
+    const auto commands = convertPipeline(pipeline);
 
     int fds1[2];
 
-    for (size_t i = 0; i < transformedCommands.size(); i++) {
+    for (size_t i = 0; i < commands.size(); i++) {
         if (i == 0) {
             pipe(fds1);
-            runSimpleCommandStartPipe(&transformedCommands.at(i), fds1);
+            runStatementStartInPipe(commands.at(i), fds1);
         } else if (i == commands.size() - 1) {
-            runSimpleCommandEndPipe(&transformedCommands.at(i), fds1);
+            runStatementEndInPipe(commands.at(i), fds1);
             close(fds1[0]);
             close(fds1[1]);
         } else {
             int fds2[2];
 
             pipe(fds2);
-            runSimpleCommandPipe(&transformedCommands.at(i), fds1, fds2);
+            runStatementInPipe(commands.at(i), fds1, fds2);
             close(fds1[0]);
             close(fds1[1]);
             fds1[0] = fds2[0];
@@ -116,35 +117,33 @@ void Interpreter::visit(const Pipeline *pipeline) {
     }
 }
 
-void Interpreter::runSimpleCommandStartPipe(const SimpleCommand *com, int fds1[]) {
+void Interpreter::runStatementStartInPipe(const Statement *stmt, int fds[]) {
     if (fork() == 0) {
-        dup2(fds1[1], 1);
-        close(fds1[1]);
-        close(fds1[0]);
-        if (auto builtInCom = getBuiltinCommand(com)) {
-            (*builtInCom)(*this, com);
-            exit(0);
-        }
-        executeCommand(com);
+        dup2(fds[1], 1);
+        close(fds[1]);
+        close(fds[0]);
+
+        PipelineExecutor executor(this);
+        stmt->accept(&executor);
+        exit(0);
     }
 
     wait(nullptr);
 }
 
-void Interpreter::runSimpleCommandEndPipe(const SimpleCommand *com, int fds1[]) {
+void Interpreter::runStatementEndInPipe(const Statement *stmt, int fds[]) {
     if (fork() == 0) {
-        dup2(fds1[0], 0);
-        close(fds1[0]);
-        close(fds1[1]);
-        if (auto builtInCom = getBuiltinCommand(com)) {
-            (*builtInCom)(*this, com);
-            exit(0);
-        }
-        executeCommand(com);
+        dup2(fds[0], 0);
+        close(fds[0]);
+        close(fds[1]);
+
+        PipelineExecutor executor(this);
+        stmt->accept(&executor);
+        exit(0);
     }
 }
 
-void Interpreter::runSimpleCommandPipe(const SimpleCommand *com, int fds1[], int fds2[]) {
+void Interpreter::runStatementInPipe(const Statement *stmt, int fds1[], int fds2[]) {
     if (fork() == 0) {
         close(fds1[1]);
         close(fds2[0]);
@@ -152,11 +151,10 @@ void Interpreter::runSimpleCommandPipe(const SimpleCommand *com, int fds1[], int
         dup2(fds2[1], 1);
         close(fds1[0]);
         close(fds2[1]);
-        if (auto builtInCom = getBuiltinCommand(com)) {
-            (*builtInCom)(*this, com);
-            exit(0);
-        }
-        executeCommand(com);
+
+        PipelineExecutor executor(this);
+        stmt->accept(&executor);
+        exit(0);
     }
 }
 
@@ -174,15 +172,12 @@ void Interpreter::visit(const Subshell *subshell) {
         Lexer lexer(&inputStream);
         yy::parser parser(lexer, *this, false);
         parser();
+        exit(0);
     }
 
     wait(nullptr);
 }
-std::vector<const SimpleCommand *> Interpreter::convertPipeline(const Pipeline *pipeline) {
-    std::unique_ptr<PipelineConverter> pipelineSerializer = std::make_unique<PipelineConverter>();
-    pipeline->accept(pipelineSerializer.get());
-    return pipelineSerializer->getResult();
-}
+
 std::string Interpreter::getSymbol(const std::string &name) {
     auto varValue = variables.find(name);
     if (varValue == variables.end()) {
@@ -221,15 +216,20 @@ std::string Interpreter::performWordExpansions(const std::string &text) {
 
     return newText;
 }
-void Interpreter::transformCommand(SimpleCommand &com) {
-    com.name = performWordExpansions(com.name);
-    for (auto &arg: com.args) {
-        arg = performWordExpansions(arg);
-    }
+
+SimpleCommand Interpreter::transformCommand(const SimpleCommand &com) {
+    SimpleCommand transformedCommand(com);
+    transformedCommand.name = performWordExpansions(com.name);
+
+    const auto argTransformation = [this](auto text) { return this->performWordExpansions(text); };
+    std::transform(com.args.begin(), com.args.end(), transformedCommand.args.begin(), argTransformation);
+    return transformedCommand;
 }
+
 void Interpreter::prompt() {
     std::cout << getSymbol("USER") << ":" << shortPwd() << "$ ";
 }
+
 std::string Interpreter::shortPwd() {
     fs::path pwd(getSymbol("PWD"));
     fs::path home(getSymbol("HOME"));
@@ -237,12 +237,22 @@ std::string Interpreter::shortPwd() {
     if (pwd == home) return "~";
     return "~/" + fs::relative(pwd, home).string();
 }
+
 void Interpreter::PipelineConverter::visit(const SimpleCommand *simpleCommand) {
     result.push_back(simpleCommand);
 }
+
 void Interpreter::PipelineConverter::visit(const Pipeline *pipeline) {
     pipeline->lhs->accept(this);
     pipeline->rhs->accept(this);
+}
+
+void Interpreter::PipelineConverter::visit(const Subshell *subshell) {
+    result.push_back(subshell);
+}
+
+void Interpreter::PipelineConverter::visit(const Assignment *assignment) {
+    result.push_back(assignment);
 }
 
 
@@ -283,3 +293,31 @@ const std::initializer_list<std::pair<std::string, std::function<void(Interprete
         {".", [](Interpreter &interpreter, auto com) { interpreter.runScript(com); }},
         {"export", [](Interpreter &interpreter, auto com) { interpreter.exportVar(com); }},
 };
+
+void Interpreter::PipelineExecutor::visit(const SimpleCommand *simpleCommand) {
+    const auto transformedCommand = interpreter->transformCommand(*simpleCommand);
+
+    if (auto builtInCom = interpreter->getBuiltinCommand(&transformedCommand)) {
+        (*builtInCom)(*interpreter, &transformedCommand);
+        exit(0);
+    }
+    executeCommand(&transformedCommand);
+}
+
+void Interpreter::PipelineExecutor::visit(const Pipeline *pipeline) {
+    std::runtime_error("Nested pipeline. That should not be possible after flattening");
+}
+
+void Interpreter::PipelineExecutor::visit(const Assignment *assignment) {
+    interpreter->visit(assignment);
+}
+
+void Interpreter::PipelineExecutor::visit(const Subshell *subshell) {
+    for (const auto &red: subshell->redirections) {
+        redirectToFile(&red);
+    }
+    std::istringstream inputStream(subshell->cmds);
+    Lexer lexer(&inputStream);
+    yy::parser parser(lexer, *interpreter, false);
+    parser();
+}
