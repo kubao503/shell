@@ -127,8 +127,6 @@ void Interpreter::runStatementStartInPipe(const Statement *stmt, int fds[]) {
         stmt->accept(&executor);
         exit(0);
     }
-
-    wait(nullptr);
 }
 
 void Interpreter::runStatementEndInPipe(const Statement *stmt, int fds[]) {
