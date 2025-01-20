@@ -60,7 +60,8 @@ void Interpreter::executeCommand(const SimpleCommand *com) {
         }
     }
     if (com->args.empty()) {
-        execlp(com->name.c_str(), com->name.c_str(), NULL);
+        if (int res = execlp(com->name.c_str(), com->name.c_str(), NULL))
+            std::cerr << "Failed to execute command: " << com->name << '\n';
         exit(-1);
     } else {
         std::vector<const char *> args;
@@ -69,7 +70,8 @@ void Interpreter::executeCommand(const SimpleCommand *com) {
             args.push_back(arg.c_str());
         }
         args.push_back(nullptr);
-        execvp(com->name.c_str(), const_cast<char *const *>(args.data()));
+        if (int res = execvp(com->name.c_str(), const_cast<char *const *>(args.data())))
+            std::cerr << "Failed to execute command: " << com->name << '\n';
         exit(-1);
     }
 }
