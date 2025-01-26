@@ -6,6 +6,7 @@ add_executable(
     test_word_expansion.cc
     ../interpreter/interpreter.cc
     ../interpreter/util.cc
+    ../interpreter/pipeline_converter.cc
 )
 
 target_link_libraries(

@@ -3,6 +3,7 @@
 
 #include "ast.hh"
 #include "parser_output.hh"
+#include <cstring>
 #include <functional>
 #include <optional>
 #include <unordered_map>
@@ -12,9 +13,12 @@ class InterpreterError : public std::exception {
 private:
     int exitCode;
     std::string message;
+    std::string whatMsg;
 public:
-    InterpreterError(std::string message, int exitCode) : message(std::move(message)), exitCode(exitCode) {};
-    InterpreterError(std::string message) : message(std::move(message)), exitCode(1) {};
+    InterpreterError(const std::string& message, int errNum) : message(message),
+                                                          exitCode(errNum),
+                                                          whatMsg(message + " (" + std::string(strerror(errNum)) + ")") {};
+    explicit InterpreterError(const std::string& message) : message(message), exitCode(1), whatMsg(message) {};
     [[nodiscard]] int getExitCode() const {return exitCode;}
     [[nodiscard]] std::string getMessage() const {return message;}
     [[nodiscard]] const char * what() const noexcept override;
