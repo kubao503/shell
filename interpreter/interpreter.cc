@@ -2,6 +2,7 @@
 
 #include "ast.hh"
 #include "lexer.hh"
+#include "pipeline_converter.hh"
 #include "util.h"
 
 #include <algorithm>
@@ -237,24 +238,6 @@ std::string Interpreter::shortPwd() {
     if (pwd == home) return "~";
     return "~/" + fs::relative(pwd, home).string();
 }
-
-void Interpreter::PipelineConverter::visit(const SimpleCommand *simpleCommand) {
-    result.push_back(simpleCommand);
-}
-
-void Interpreter::PipelineConverter::visit(const Pipeline *pipeline) {
-    pipeline->lhs->accept(this);
-    pipeline->rhs->accept(this);
-}
-
-void Interpreter::PipelineConverter::visit(const Subshell *subshell) {
-    result.push_back(subshell);
-}
-
-void Interpreter::PipelineConverter::visit(const Assignment *assignment) {
-    result.push_back(assignment);
-}
-
 
 void Interpreter::changeDirectory(const SimpleCommand *com) {
     if (com->args.size() > 1) throw std::runtime_error("Expected no more than one argument");

@@ -10,18 +10,6 @@
 
 
 class Interpreter : public ParserOutput, StatementVisitor {
-    class PipelineConverter : public StatementVisitor {
-    private:
-        std::vector<const Statement *> result;
-
-    public:
-        auto getResult() { return result; }
-        void visit(const Subshell *subshell) override;
-        void visit(const Assignment *assignment) override;
-        void visit(const SimpleCommand *simpleCommand) override;
-        void visit(const Pipeline *pipeline) override;
-    };
-
     struct PipelineExecutor : public StatementVisitor {
         Interpreter *interpreter;
 

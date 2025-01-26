@@ -22,5 +22,6 @@ add_executable(
     interpreter/interpreter.cc
     interpreter/printer.cc
     interpreter/util.cc
+    interpreter/pipeline_converter.cc
 )
 target_link_libraries(${PROJECT_NAME} PRIVATE parser)
