@@ -54,7 +54,7 @@ private:
     void runStatementEndInPipe(const Statement *stmt, int fds1[]);
     static auto convertPipeline(const Pipeline *pipeline);
     static void executeCommand(const SimpleCommand *com);
-    std::optional<BuiltInCommand> getBuiltinCommand(const SimpleCommand *com);
+    static std::optional<BuiltInCommand> getBuiltinCommand(const SimpleCommand *com);
     void visit(const SimpleCommand *simpleCommand) override;
     void visit(const Assignment *assignment) override;
     void visit(const Pipeline *pipeline) override;
@@ -63,7 +63,7 @@ private:
     SimpleCommand transformCommand(const SimpleCommand &com);
     std::string shortPwd();
 
-    void changeDirectory(const SimpleCommand *com);
+    static void changeDirectory(const SimpleCommand *com);
     void runScript(const SimpleCommand *com);
     void exportVar(const SimpleCommand *com);
 
