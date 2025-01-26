@@ -6,6 +6,7 @@
 #include "util.h"
 
 #include <algorithm>
+#include <cstring>
 #include <fcntl.h>
 #include <filesystem>
 #include <fstream>
@@ -26,17 +27,20 @@ void Interpreter::redirectToFile(const Redirection *redirection) {
     if (redirection->type == RedirectionType::OUT) {
         fd = open(redirection->file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
         if (fd == -1) {
-            throw std::runtime_error("Error creating file");
+            throw std::runtime_error("Error creating file: " + std::string(strerror(errno)));
         }
-        dup2(fd, STDOUT_FILENO);
+        if(dup2(fd, STDOUT_FILENO))
+            throw std::runtime_error("Descriptor duplication failed with error: " + std::string(strerror(errno)));
     } else {
         fd = open(redirection->file.c_str(), O_RDONLY);
         if (fd == -1) {
-            throw std::runtime_error("Error creating file");
+            throw std::runtime_error("Error creating file: " + std::string(strerror(errno)));
         }
-        dup2(fd, STDIN_FILENO);
+        if(dup2(fd, STDIN_FILENO))
+            throw std::runtime_error("Descriptor duplication failed with error: " + std::string(strerror(errno)));
     }
-    close(fd);
+    if(close(fd))
+        throw std::runtime_error("Failed to close descriptor with error: " + std::string(strerror(errno)));
 }
 
 void Interpreter::visit(const SimpleCommand *simpleCommand) {
@@ -46,12 +50,20 @@ void Interpreter::visit(const SimpleCommand *simpleCommand) {
         (*builtInCom)(*this, simpleCommand);
         return;
     }
-    if (fork() == 0) {
+    int forkReturn = fork();
+    if (forkReturn == 0) {
         executeCommand(&transformedCommand);
         exit(-1);
+    } else if (forkReturn == -1) {
+        throw std::runtime_error("Process creation failed with error: " + std::string(strerror(errno)));
     }
-
-    wait(nullptr);
+    // PID of the created process can be safely ignored
+    int exitStatus = 0;
+    int waitReturn = wait(&exitStatus);
+    if(waitReturn == -1) {
+        throw std::runtime_error("Wait failed with error: " + std::string(strerror(errno)));
+    }
+    this->exitCode = WEXITSTATUS(exitStatus);
 }
 
 void Interpreter::executeCommand(const SimpleCommand *com) {
@@ -61,8 +73,11 @@ void Interpreter::executeCommand(const SimpleCommand *com) {
         }
     }
     if (com->args.empty()) {
-        if (int res = execlp(com->name.c_str(), com->name.c_str(), NULL))
-            std::cerr << "Failed to execute command: " << com->name << '\n';
+        if (execlp(com->name.c_str(), com->name.c_str(), NULL)) {
+            int execErrno = errno;
+            std::cerr << "Failed to execute command " << com->name << " with error: " << strerror(execErrno) << ")\n";
+            exit(execErrno);
+        }
         exit(-1);
     } else {
         std::vector<const char *> args;
@@ -71,8 +86,11 @@ void Interpreter::executeCommand(const SimpleCommand *com) {
             args.push_back(arg.c_str());
         }
         args.push_back(nullptr);
-        if (int res = execvp(com->name.c_str(), const_cast<char *const *>(args.data())))
-            std::cerr << "Failed to execute command: " << com->name << '\n';
+        if (execvp(com->name.c_str(), const_cast<char *const *>(args.data()))) {
+            int execErrno = errno;
+            std::cerr << "Failed to execute command " << com->name << " with error: " << strerror(execErrno) << ")\n";
+            exit(execErrno);
+        }
         exit(-1);
     }
 }
@@ -94,69 +112,84 @@ void Interpreter::visit(const Pipeline *pipeline) {
     const auto commands = convertPipeline(pipeline);
 
     int fds1[2];
-
+    std::vector<int> pids;
     for (size_t i = 0; i < commands.size(); i++) {
         if (i == 0) {
-            pipe(fds1);
-            runStatementStartInPipe(commands.at(i), fds1);
+            if(pipe(fds1))
+                throw std::runtime_error("Pipe creation failed with error: " + std::string(strerror(errno)));
+            int forkReturn = fork();
+            if(forkReturn == 0) runStatementStartInPipe(commands.at(i), fds1);
+            else if (forkReturn == -1) throw std::runtime_error("Process creation failed with error: " + std::string(strerror(errno)));
+            pids.push_back(forkReturn);
         } else if (i == commands.size() - 1) {
-            runStatementEndInPipe(commands.at(i), fds1);
-            close(fds1[0]);
-            close(fds1[1]);
+            int forkReturn = fork();
+            if(forkReturn == 0) runStatementEndInPipe(commands.at(i), fds1);
+            else if (forkReturn == -1) throw std::runtime_error("Process creation failed with error: " + std::string(strerror(errno)));
+            pids.push_back(forkReturn);
+            if(close(fds1[0]))
+                throw std::runtime_error("Failed to close descriptor with error: " + std::string(strerror(errno)));
+            if(close(fds1[1]))
+                throw std::runtime_error("Failed to close descriptor with error: " + std::string(strerror(errno)));
         } else {
             int fds2[2];
-
-            pipe(fds2);
-            runStatementInPipe(commands.at(i), fds1, fds2);
-            close(fds1[0]);
-            close(fds1[1]);
+            if(pipe(fds2))
+                throw std::runtime_error("Pipe creation failed with error: " + std::string(strerror(errno)));
+            int forkReturn = fork();
+            if(forkReturn == 0) runStatementInPipe(commands.at(i), fds1, fds2);
+            else if (forkReturn == -1) throw std::runtime_error("Process creation failed with error: " + std::string(strerror(errno)));
+            pids.push_back(forkReturn);
+            if(close(fds1[0]))
+                throw std::runtime_error("Failed to close descriptor with error: " + std::string(strerror(errno)));
+            if(close(fds1[1]))
+                throw std::runtime_error("Failed to close descriptor with error: " + std::string(strerror(errno)));
             fds1[0] = fds2[0];
             fds1[1] = fds2[1];
         }
     }
-
-    for (size_t i = 0; i < commands.size(); i++) {
-        wait(nullptr);
+    int lastExitStatus = 0;
+    for (int pid : pids) {
+        waitpid(pid, &lastExitStatus, 0);
     }
+    this->exitCode = WEXITSTATUS(lastExitStatus);
 }
 
 void Interpreter::runStatementStartInPipe(const Statement *stmt, int fds[]) {
-    if (fork() == 0) {
-        dup2(fds[1], 1);
-        close(fds[1]);
-        close(fds[0]);
+    if(dup2(fds[1], 1))
+        handleErrnoExit("Descriptor duplication failed");
+    if(close(fds[1]))
+        handleErrnoExit("Failed to close descriptor");
+    if(close(fds[0]))
+        handleErrnoExit("Failed to close descriptor");
 
-        PipelineExecutor executor(this);
-        stmt->accept(&executor);
-        exit(0);
-    }
+    PipelineExecutor executor(this);
+    stmt->accept(&executor);
+    exit(0);
 }
 
 void Interpreter::runStatementEndInPipe(const Statement *stmt, int fds[]) {
-    if (fork() == 0) {
-        dup2(fds[0], 0);
-        close(fds[0]);
-        close(fds[1]);
+    if(dup2(fds[0], 0))
+        handleErrnoExit("Descriptor duplication failed");
+    if(close(fds[0]))
+        handleErrnoExit("Failed to close descriptor");
+    if(close(fds[1]))
+        handleErrnoExit("Failed to close descriptor");
 
-        PipelineExecutor executor(this);
-        stmt->accept(&executor);
-        exit(0);
-    }
+    PipelineExecutor executor(this);
+    stmt->accept(&executor);
+    exit(0);
 }
 
 void Interpreter::runStatementInPipe(const Statement *stmt, int fds1[], int fds2[]) {
-    if (fork() == 0) {
-        close(fds1[1]);
-        close(fds2[0]);
-        dup2(fds1[0], 0);
-        dup2(fds2[1], 1);
-        close(fds1[0]);
-        close(fds2[1]);
+    if(close(fds1[1])) handleErrnoExit("Failed to close descriptor");
+    if(close(fds2[0])) handleErrnoExit("Failed to close descriptor");
+    if(dup2(fds1[0], 0)) handleErrnoExit("Descriptor duplication failed");
+    if(dup2(fds2[1], 1)) handleErrnoExit("Descriptor duplication failed");
+    if(close(fds1[0])) handleErrnoExit("Failed to close descriptor");
+    if(close(fds2[1])) handleErrnoExit("Failed to close descriptor");
 
-        PipelineExecutor executor(this);
-        stmt->accept(&executor);
-        exit(0);
-    }
+    PipelineExecutor executor(this);
+    stmt->accept(&executor);
+    exit(0);
 }
 
 void Interpreter::PipelineExecutor::visit(const SimpleCommand *simpleCommand) {
@@ -170,11 +203,12 @@ void Interpreter::PipelineExecutor::visit(const SimpleCommand *simpleCommand) {
 }
 
 void Interpreter::PipelineExecutor::visit(const Pipeline *pipeline) {
-    throw std::runtime_error("Nested pipeline. That should not be possible after flattening");
+    std::cerr << "Nested pipeline. That should not be possible after flattening";
+    exit(1);
 }
 
 void Interpreter::PipelineExecutor::visit(const Assignment *assignment) {
-    interpreter->visit(assignment);
+    assignment->accept(interpreter);
 }
 
 void Interpreter::PipelineExecutor::visit(const Subshell *subshell) {
@@ -193,7 +227,8 @@ void Interpreter::visit(const Assignment *assignment) {
 }
 
 void Interpreter::visit(const Subshell *subshell) {
-    if (fork() == 0) {
+    int forkReturn = fork();
+    if (forkReturn == 0) {
         for (const auto &red: subshell->redirections) {
             redirectToFile(&red);
         }
@@ -202,12 +237,20 @@ void Interpreter::visit(const Subshell *subshell) {
         yy::parser parser(lexer, *this, false);
         parser();
         exit(0);
+    } else if (forkReturn == -1) {
+        throw std::runtime_error("Process creation failed with error: " + std::string(strerror(errno)));
     }
 
-    wait(nullptr);
+    int exitStatus = 0;
+    int waitReturn = wait(&exitStatus);
+    if(waitReturn == -1) {
+        throw std::runtime_error("Wait failed with error: " + std::string(strerror(errno)));
+    }
+    this->exitCode = WEXITSTATUS(exitStatus);
 }
 
 std::string Interpreter::getSymbol(const std::string &name) {
+    if(name == "?") return std::to_string(this->exitCode);
     auto varValue = variables.find(name);
     if (varValue == variables.end()) {
         auto envValue = getenv(name.c_str());
@@ -223,7 +266,7 @@ std::string Interpreter::performWordExpansions(const std::string &text) {
 
     for (auto it = text.begin(); it != text.end(); ++it) {
         if (dollarExpressionStart != text.end()) {
-            if (isalnum(*it)) {
+            if (isalnum(*it) || *it == '?') {
                 continue;
             } else {
                 newText += getSymbol(std::string(dollarExpressionStart, it));
@@ -271,13 +314,13 @@ void Interpreter::changeDirectory(const SimpleCommand *com) {
     if (com->args.size() > 1) throw std::runtime_error("Expected no more than one argument");
     auto path = com->args.empty() ? getenv("HOME") : com->args.at(0).c_str();
     if (chdir(path))
-        throw std::runtime_error("cd failed with error code: " + std::to_string(errno));
+        throw InterpreterError("cd failed", errno);
     char buf[4096];
     auto absPath = getcwd(buf, sizeof(buf));
     if (!absPath)
-        throw std::runtime_error("getcwd failed");
+        throw InterpreterError("getcwd failed", errno);
     if (setenv("PWD", absPath, true))
-        throw std::runtime_error("PWD failed with error code: " + std::to_string(errno));
+        throw InterpreterError("PWD failed", errno);
 }
 
 
@@ -304,3 +347,7 @@ const std::initializer_list<std::pair<std::string, std::function<void(Interprete
         {".", [](Interpreter &interpreter, auto com) { interpreter.runScript(com); }},
         {"export", [](Interpreter &interpreter, auto com) { interpreter.exportVar(com); }},
 };
+const char * InterpreterError::what() const noexcept {
+    std::string msg = message + " with error: " + std::string(strerror(exitCode));
+    return std::move(msg).c_str();
+}

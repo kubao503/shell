@@ -8,6 +8,17 @@
 #include <unordered_map>
 #include <utility>
 
+class InterpreterError : public std::exception {
+private:
+    int exitCode;
+    std::string message;
+public:
+    InterpreterError(std::string message, int exitCode) : message(std::move(message)), exitCode(exitCode) {};
+    InterpreterError(std::string message) : message(std::move(message)), exitCode(1) {};
+    [[nodiscard]] int getExitCode() const {return exitCode;}
+    [[nodiscard]] std::string getMessage() const {return message;}
+    [[nodiscard]] const char * what() const noexcept override;
+};
 
 class Interpreter : public ParserOutput, StatementVisitor {
     struct PipelineExecutor : public StatementVisitor {
@@ -25,11 +36,12 @@ public:
     void interpret(std::vector<std::unique_ptr<Statement>> statements) override;
     void prompt() override;
     std::string performWordExpansions(const std::string &text);
-
+    int getExitCode() const {return this->exitCode;}
 private:
     using BuiltInCommand = std::function<void(Interpreter &, const SimpleCommand *)>;
     static const std::initializer_list<std::pair<std::string, BuiltInCommand>> builtInCommands;
     std::unordered_map<std::string, std::string> variables;
+    int exitCode;
 
     std::string getSymbol(const std::string &name);
 
@@ -50,6 +62,7 @@ private:
     void changeDirectory(const SimpleCommand *com);
     void runScript(const SimpleCommand *com);
     void exportVar(const SimpleCommand *com);
+
 };
 
 #endif
