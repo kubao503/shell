@@ -159,6 +159,34 @@ void Interpreter::runStatementInPipe(const Statement *stmt, int fds1[], int fds2
     }
 }
 
+void Interpreter::PipelineExecutor::visit(const SimpleCommand *simpleCommand) {
+    const auto transformedCommand = interpreter->transformCommand(*simpleCommand);
+
+    if (auto builtInCom = interpreter->getBuiltinCommand(&transformedCommand)) {
+        (*builtInCom)(*interpreter, &transformedCommand);
+        exit(0);
+    }
+    executeCommand(&transformedCommand);
+}
+
+void Interpreter::PipelineExecutor::visit(const Pipeline *pipeline) {
+    throw std::runtime_error("Nested pipeline. That should not be possible after flattening");
+}
+
+void Interpreter::PipelineExecutor::visit(const Assignment *assignment) {
+    interpreter->visit(assignment);
+}
+
+void Interpreter::PipelineExecutor::visit(const Subshell *subshell) {
+    for (const auto &red: subshell->redirections) {
+        redirectToFile(&red);
+    }
+    std::istringstream inputStream(subshell->cmds);
+    Lexer lexer(&inputStream);
+    yy::parser parser(lexer, *interpreter, false);
+    parser();
+}
+
 void Interpreter::visit(const Assignment *assignment) {
     const auto transformedValue = performWordExpansions(assignment->value);
     variables[assignment->var] = transformedValue;
@@ -276,31 +304,3 @@ const std::initializer_list<std::pair<std::string, std::function<void(Interprete
         {".", [](Interpreter &interpreter, auto com) { interpreter.runScript(com); }},
         {"export", [](Interpreter &interpreter, auto com) { interpreter.exportVar(com); }},
 };
-
-void Interpreter::PipelineExecutor::visit(const SimpleCommand *simpleCommand) {
-    const auto transformedCommand = interpreter->transformCommand(*simpleCommand);
-
-    if (auto builtInCom = interpreter->getBuiltinCommand(&transformedCommand)) {
-        (*builtInCom)(*interpreter, &transformedCommand);
-        exit(0);
-    }
-    executeCommand(&transformedCommand);
-}
-
-void Interpreter::PipelineExecutor::visit(const Pipeline *pipeline) {
-    throw std::runtime_error("Nested pipeline. That should not be possible after flattening");
-}
-
-void Interpreter::PipelineExecutor::visit(const Assignment *assignment) {
-    interpreter->visit(assignment);
-}
-
-void Interpreter::PipelineExecutor::visit(const Subshell *subshell) {
-    for (const auto &red: subshell->redirections) {
-        redirectToFile(&red);
-    }
-    std::istringstream inputStream(subshell->cmds);
-    Lexer lexer(&inputStream);
-    yy::parser parser(lexer, *interpreter, false);
-    parser();
-}
