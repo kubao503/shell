@@ -15,11 +15,13 @@ int main(int argc, char* argv[]) {
         Lexer lexer(&inputStream);
         Interpreter interpreter;
         yy::parser parser(lexer, interpreter, false);
-        return parser();
+        parser();
+        return interpreter.getExitCode();
     }
     Lexer lexer;
     Interpreter interpreter;
     yy::parser parser(lexer, interpreter, true);
     interpreter.prompt();
-    return parser();
+    parser();
+    return interpreter.getExitCode();
 }
