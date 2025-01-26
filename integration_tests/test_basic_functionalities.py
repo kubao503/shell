@@ -37,13 +37,13 @@ def test_change_directory_no_args(shell_container: TestContainer):
     assert result.output.decode("utf-8") == '/root\n'
 
 def test_redirections_in_out(shell_container: TestContainer):
-    result = shell_container.run_uxsh(r"echo -e orange\nplum > file.txt | echo orange | grep l < file.txt")
+    result = shell_container.run_uxsh(r"echo -e orange\nplum > file.txt; grep l < file.txt")
     assert result.exit_code == 0
     assert result.output.decode("utf-8") == 'plum\n'
 
 def test_multiple_redirections_in_out(shell_container: TestContainer):
-    result = shell_container.run_uxsh(r"echo -e orange\nplum > file.txt > file2.txt | echo orange | grep l < file.txt < file2.txt > grep_result.txt")
+    result = shell_container.run_uxsh(r"echo -e orange\nplum > file.txt > file2.txt; grep l < file.txt < file2.txt > grep_result.txt")
     assert result.exit_code == 0
-    assert shell_container.read_file('grep_result.txt') == b'plum\n'
     assert shell_container.read_file('file.txt') == b''
     assert shell_container.read_file('file2.txt') == b'orange\nplum\n'
+    assert shell_container.read_file('grep_result.txt') == b'plum\n'
