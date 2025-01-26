@@ -21,6 +21,7 @@ void Interpreter::interpret(std::vector<std::unique_ptr<Statement>> statements) 
     for (const auto &statement: statements) {
         try {
             statement->accept(this);
+            this->exitCode = 0;
         } catch(InterpreterError& e) {
             this->exitCode = e.getExitCode();
             std::cerr << e.what() << "\n";
