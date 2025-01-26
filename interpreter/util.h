@@ -10,6 +10,4 @@ namespace fs = std::filesystem;
 
 bool isSubDir(fs::path p, const fs::path& root);
 
-void handleErrnoExit(std::string text);
-
 #endif//UXSH_UTIL_H

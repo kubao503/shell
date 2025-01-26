@@ -198,7 +198,7 @@ void Interpreter::runStatementInPipe(const Statement *stmt, int fds1[], int fds2
     if(dup2(fds1[0], 0) == -1) throw InterpreterError("Descriptor duplication failed", errno);
     if(dup2(fds2[1], 1) == -1) throw InterpreterError("Descriptor duplication failed", errno);
     if(close(fds1[0]) == -1) throw InterpreterError("Failed to close descriptor", errno);
-    if(close(fds2[1]) == -1) handleErrnoExit("Failed to close descriptor");
+    if(close(fds2[1]) == -1) throw InterpreterError("Failed to close descriptor", errno);
 
     PipelineExecutor executor(this);
     stmt->accept(&executor);
@@ -208,7 +208,7 @@ void Interpreter::runStatementInPipe(const Statement *stmt, int fds1[], int fds2
 void Interpreter::PipelineExecutor::visit(const SimpleCommand *simpleCommand) {
     const auto transformedCommand = interpreter->transformCommand(*simpleCommand);
 
-    if (auto builtInCom = interpreter->getBuiltinCommand(&transformedCommand)) {
+    if (auto builtInCom = Interpreter::getBuiltinCommand(&transformedCommand)) {
         (*builtInCom)(*interpreter, &transformedCommand);
         exit(0);
     }
@@ -361,7 +361,7 @@ void Interpreter::exportVar(const SimpleCommand *com) {
 }
 
 const std::initializer_list<std::pair<std::string, std::function<void(Interpreter &, const SimpleCommand *com)>>> Interpreter::builtInCommands{
-        {"cd", [](Interpreter &interpreter, auto com) { interpreter.changeDirectory(com); }},
+        {"cd", [](Interpreter &interpreter, auto com) { Interpreter::changeDirectory(com); }},
         {".", [](Interpreter &interpreter, auto com) { interpreter.runScript(com); }},
         {"export", [](Interpreter &interpreter, auto com) { interpreter.exportVar(com); }},
 };
