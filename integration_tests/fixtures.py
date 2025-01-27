@@ -20,7 +20,10 @@ class TestContainer:
         return self.run(['uxsh', '-c', cmd])
 
     def read_file(self, path: str) -> bytes:
-        bits, _ = self.container.get_archive(path)
+        try:
+            bits, _ = self.container.get_archive(path)
+        except Exception:
+            raise Exception('Cannot load file')
         with tarfile.open(fileobj=BytesIO(b''.join(bits))) as tar:
             file_info = tar.getmember(path.lstrip('/'))
             extracted_file = tar.extractfile(file_info)

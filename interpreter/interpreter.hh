@@ -63,10 +63,11 @@ private:
     SimpleCommand transformCommand(const SimpleCommand &com);
     std::string shortPwd();
 
-    static void changeDirectory(const SimpleCommand *com);
+    void changeDirectory(const SimpleCommand *com);
     void runScript(const SimpleCommand *com);
     void exportVar(const SimpleCommand *com);
-
+    void pwd(const SimpleCommand *com);
+    void echo(const SimpleCommand *com);
 };
 
 #endif
