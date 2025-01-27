@@ -48,8 +48,15 @@ void Interpreter::visit(const SimpleCommand *simpleCommand) {
     const auto transformedCommand = transformCommand(*simpleCommand);
 
     if (auto builtInCom = getBuiltinCommand(&transformedCommand)) {
+        int savedStdin = dup(STDIN_FILENO);
+        int savedStdout = dup(STDOUT_FILENO);
+        for (const auto & red : transformedCommand.redirections) {
+            redirectToFile(&red);
+        }
         (*builtInCom)(*this, &transformedCommand);
         this->exitCode = 0;
+        dup2(savedStdin, STDIN_FILENO);
+        dup2(savedStdout, STDOUT_FILENO);
         return;
     }
     int forkReturn = fork();
@@ -210,7 +217,14 @@ void Interpreter::PipelineExecutor::visit(const SimpleCommand *simpleCommand) {
     const auto transformedCommand = interpreter->transformCommand(*simpleCommand);
 
     if (auto builtInCom = Interpreter::getBuiltinCommand(&transformedCommand)) {
+        int savedStdin = dup(STDIN_FILENO);
+        int savedStdout = dup(STDOUT_FILENO);
+        for(const auto & red : transformedCommand.redirections) {
+            redirectToFile(&red);
+        }
         (*builtInCom)(*interpreter, &transformedCommand);
+        dup2(savedStdin, STDIN_FILENO);
+        dup2(savedStdout, STDOUT_FILENO);
         exit(0);
     }
     executeCommand(&transformedCommand);
