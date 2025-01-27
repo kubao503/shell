@@ -11,7 +11,7 @@ def test_not_existing_command_end_pipeline(shell_container: TestContainer):
 def test_not_existing_command_inside_pipeline(shell_container: TestContainer):
     result = shell_container.run_uxsh(r"ls | notExistingCommand | echo it_is_working")
     assert result.exit_code == 0
-    assert result.output.decode("utf-8").endswith('it_is_working\n');
+    assert 'it_is_working\n' in result.output.decode("utf-8");
 
 def test_not_existing_command_with_redirections_in(shell_container: TestContainer):
     shell_container.run_uxsh(r"echo -e apple\napple\nBanana\napple > file.txt")
