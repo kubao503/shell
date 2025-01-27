@@ -48,8 +48,8 @@ void Interpreter::redirectToFile(const Redirection *redirection) {
 void Interpreter::visit(const SimpleCommand *simpleCommand) {
     const auto transformedCommand = transformCommand(*simpleCommand);
 
-    if (auto builtInCom = getBuiltinCommand(simpleCommand)) {
-        (*builtInCom)(*this, simpleCommand);
+    if (auto builtInCom = getBuiltinCommand(&transformedCommand)) {
+        (*builtInCom)(*this, &transformedCommand);
         return;
     }
     int forkReturn = fork();
@@ -362,10 +362,32 @@ void Interpreter::exportVar(const SimpleCommand *com) {
 }
 
 const std::initializer_list<std::pair<std::string, std::function<void(Interpreter &, const SimpleCommand *com)>>> Interpreter::builtInCommands{
-        {"cd", [](Interpreter &interpreter, auto com) { Interpreter::changeDirectory(com); }},
+        {"cd", [](Interpreter &interpreter, auto com) { interpreter.changeDirectory(com); }},
         {".", [](Interpreter &interpreter, auto com) { interpreter.runScript(com); }},
         {"export", [](Interpreter &interpreter, auto com) { interpreter.exportVar(com); }},
+        {"pwd", [](Interpreter &interpreter, auto com) { interpreter.pwd(com); }},
+        {"echo", [](Interpreter &interpreter, auto com){ interpreter.echo(com);}}
 };
+void Interpreter::pwd(const SimpleCommand *com) {
+    if (!com->args.empty()) throw InterpreterError("Expected no arguments");
+    char buf[4096];
+    auto cwd = getcwd(buf, sizeof(buf));
+    if (!cwd)
+        throw InterpreterError("getcwd failed", errno);
+    std::cout << cwd << '\n';
+}
+void Interpreter::echo(const SimpleCommand *com) {
+    bool escapingMode = false;
+    if(!com->args.empty() && com->args[0] == "-e") escapingMode = true;
+    std::string mergedText;
+    for(int i = escapingMode ? 1 : 0; i < com->args.size(); i++) {
+        mergedText += com->args.at(i);
+        mergedText += ' ';
+    }
+    mergedText.resize(mergedText.size() - 1);
+    if(escapingMode) mergedText = performStandardCharEscaping(mergedText);
+    std::cout << mergedText << '\n';
+}
 const char * InterpreterError::what() const noexcept {
     return whatMsg.c_str();
 }
