@@ -21,7 +21,6 @@ void Interpreter::interpret(std::vector<std::unique_ptr<Statement>> statements) 
     for (const auto &statement: statements) {
         try {
             statement->accept(this);
-            this->exitCode = 0;
         } catch(InterpreterError& e) {
             this->exitCode = e.getExitCode();
             std::cerr << e.what() << "\n";
@@ -50,6 +49,7 @@ void Interpreter::visit(const SimpleCommand *simpleCommand) {
 
     if (auto builtInCom = getBuiltinCommand(&transformedCommand)) {
         (*builtInCom)(*this, &transformedCommand);
+        this->exitCode = 0;
         return;
     }
     int forkReturn = fork();
@@ -237,6 +237,7 @@ void Interpreter::PipelineExecutor::visit(const Subshell *subshell) {
 void Interpreter::visit(const Assignment *assignment) {
     const auto transformedValue = performWordExpansions(assignment->value);
     variables[assignment->var] = transformedValue;
+    this->exitCode = 0;
 }
 
 void Interpreter::visit(const Subshell *subshell) {
@@ -380,11 +381,13 @@ void Interpreter::echo(const SimpleCommand *com) {
     bool escapingMode = false;
     if(!com->args.empty() && com->args[0] == "-e") escapingMode = true;
     std::string mergedText;
+    bool trim = false;
     for(int i = escapingMode ? 1 : 0; i < com->args.size(); i++) {
         mergedText += com->args.at(i);
         mergedText += ' ';
+        trim = true;
     }
-    mergedText.resize(mergedText.size() - 1);
+    if(trim) mergedText.resize(mergedText.size() - 1);
     if(escapingMode) mergedText = performStandardCharEscaping(mergedText);
     std::cout << mergedText << '\n';
 }
