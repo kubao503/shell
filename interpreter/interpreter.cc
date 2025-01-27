@@ -34,14 +34,14 @@ void Interpreter::redirectToFile(const Redirection *redirection) {
         fd = open(redirection->file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
         if (fd == -1) throw InterpreterError("Error creating file", errno);
         if (dup2(fd, STDOUT_FILENO) == -1)
-            throw InterpreterError("Descriptor duplication failed 1", errno);
+            handleExitErrno("Duplicating descriptor failed");
     } else {
         fd = open(redirection->file.c_str(), O_RDONLY);
         if (fd == -1)
             throw InterpreterError("Error creating file", errno);
-        if (dup2(fd, STDIN_FILENO) == -1) throw InterpreterError("Descriptor duplication failed", errno);
+        if (dup2(fd, STDIN_FILENO) == -1) handleExitErrno("Duplicating descriptor failed");
     }
-    if (close(fd)) throw InterpreterError("Failed to close descriptor", errno);
+    if (close(fd)) handleExitErrno("Closing descriptor failed");
 }
 
 void Interpreter::visit(const SimpleCommand *simpleCommand) {
@@ -49,16 +49,23 @@ void Interpreter::visit(const SimpleCommand *simpleCommand) {
 
     if (auto builtInCom = getBuiltinCommand(&transformedCommand)) {
         int savedStdin = dup(STDIN_FILENO);
+        if(savedStdin == -1) handleExitErrno("Duplicating descriptor failed");
         int savedStdout = dup(STDOUT_FILENO);
+        if(savedStdout == -1) handleExitErrno("Duplicating descriptor failed");
         for (const auto &red: transformedCommand.redirections) {
             redirectToFile(&red);
         }
         (*builtInCom)(*this, &transformedCommand);
+        std::cout.flush();
         this->exitCode = 0;
-        dup2(savedStdin, STDIN_FILENO);
-        dup2(savedStdout, STDOUT_FILENO);
-        close(savedStdin);
-        close(savedStdout);
+        if(dup2(savedStdin, STDIN_FILENO) == -1)
+            handleExitErrno("Duplicating descriptor failed");
+        if(dup2(savedStdout, STDOUT_FILENO) == -1)
+            handleExitErrno("Duplicating descriptor failed");
+        if(close(savedStdin) == -1)
+            handleExitErrno("Closing descriptor failed");
+        if(close(savedStdout) == -1)
+            handleExitErrno("Closing descriptor failed");
         return;
     }
     int forkReturn = fork();
@@ -137,7 +144,7 @@ void Interpreter::visit(const Pipeline *pipeline) {
                 }
                 exit(-1);
             } else if (forkReturn == -1)
-                throw InterpreterError("Process creation failed", errno);
+                handleExitErrno("Process creation failed");
             pids.push_back(forkReturn);
         } else if (i == commands.size() - 1) {
             int forkReturn = fork();
@@ -150,13 +157,13 @@ void Interpreter::visit(const Pipeline *pipeline) {
                 }
                 exit(-1);
             } else if (forkReturn == -1)
-                throw InterpreterError("Process creation failed", errno);
+                handleExitErrno("Process creation failed");
             pids.push_back(forkReturn);
-            if (close(fds1[0]) == -1) throw InterpreterError("Failed to close descriptor", errno);
-            if (close(fds1[1]) == -1) throw InterpreterError("Failed to close descriptor", errno);
+            if (close(fds1[0]) == -1) handleExitErrno("Closing descriptor failed");
+            if (close(fds1[1]) == -1) handleExitErrno("Closing descriptor failed");
         } else {
             int fds2[2];
-            if (pipe(fds2) == -1) throw InterpreterError("Pipe creation failed", errno);
+            if (pipe(fds2) == -1) handleExitErrno("Creating pipe failed");
             int forkReturn = fork();
             if (forkReturn == 0) {
                 try {
@@ -167,10 +174,10 @@ void Interpreter::visit(const Pipeline *pipeline) {
                 }
                 exit(-1);
             } else if (forkReturn == -1)
-                throw InterpreterError("Process creation failed", errno);
+                handleExitErrno("Process creation failed");
             pids.push_back(forkReturn);
-            if (close(fds1[0]) == -1) throw InterpreterError("Failed to close descriptor", errno);
-            if (close(fds1[1]) == -1) throw InterpreterError("Failed to close descriptor", errno);
+            if (close(fds1[0]) == -1) handleExitErrno("Closing descriptor failed");
+            if (close(fds1[1]) == -1) handleExitErrno("Closing descriptor failed");
             fds1[0] = fds2[0];
             fds1[1] = fds2[1];
         }
@@ -183,9 +190,9 @@ void Interpreter::visit(const Pipeline *pipeline) {
 }
 
 void Interpreter::runStatementStartInPipe(const Statement *stmt, int fds[]) {
-    if (dup2(fds[1], 1) == -1) throw InterpreterError("Descriptor duplication failed", errno);
-    if (close(fds[1]) == -1) throw InterpreterError("Failed to close descriptor", errno);
-    if (close(fds[0]) == -1) throw InterpreterError("Failed to close descriptor", errno);
+    if (dup2(fds[1], 1) == -1) handleExitErrno("Duplicating descriptor failed");
+    if (close(fds[1]) == -1) handleExitErrno("Closing descriptor failed");
+    if (close(fds[0]) == -1) handleExitErrno("Closing descriptor failed");
 
     PipelineExecutor executor(this);
     stmt->accept(&executor);
@@ -193,9 +200,9 @@ void Interpreter::runStatementStartInPipe(const Statement *stmt, int fds[]) {
 }
 
 void Interpreter::runStatementEndInPipe(const Statement *stmt, int fds[]) {
-    if (dup2(fds[0], 0) == -1) throw InterpreterError("Descriptor duplication failed", errno);
-    if (close(fds[0]) == -1) throw InterpreterError("Failed to close descriptor", errno);
-    if (close(fds[1]) == -1) throw InterpreterError("Failed to close descriptor", errno);
+    if (dup2(fds[0], 0) == -1) handleExitErrno("Duplicating descriptor failed");
+    if (close(fds[0]) == -1) handleExitErrno("Closing descriptor failed");
+    if (close(fds[1]) == -1) handleExitErrno("Closing descriptor failed");
 
     PipelineExecutor executor(this);
     stmt->accept(&executor);
@@ -203,12 +210,12 @@ void Interpreter::runStatementEndInPipe(const Statement *stmt, int fds[]) {
 }
 
 void Interpreter::runStatementInPipe(const Statement *stmt, int fds1[], int fds2[]) {
-    if (close(fds1[1]) == -1) throw InterpreterError("Failed to close descriptor", errno);
-    if (close(fds2[0]) == -1) throw InterpreterError("Failed to close descriptor", errno);
-    if (dup2(fds1[0], 0) == -1) throw InterpreterError("Descriptor duplication failed", errno);
-    if (dup2(fds2[1], 1) == -1) throw InterpreterError("Descriptor duplication failed", errno);
-    if (close(fds1[0]) == -1) throw InterpreterError("Failed to close descriptor", errno);
-    if (close(fds2[1]) == -1) throw InterpreterError("Failed to close descriptor", errno);
+    if (close(fds1[1]) == -1) handleExitErrno("Closing descriptor failed");
+    if (close(fds2[0]) == -1) handleExitErrno("Closing descriptor failed");
+    if (dup2(fds1[0], 0) == -1) handleExitErrno("Duplicating descriptor failed");
+    if (dup2(fds2[1], 1) == -1) handleExitErrno("Duplicating descriptor failed");;
+    if (close(fds1[0]) == -1) handleExitErrno("Closing descriptor failed");
+    if (close(fds2[1]) == -1) handleExitErrno("Closing descriptor failed");
 
     PipelineExecutor executor(this);
     stmt->accept(&executor);
@@ -220,13 +227,17 @@ void Interpreter::PipelineExecutor::visit(const SimpleCommand *simpleCommand) {
 
     if (auto builtInCom = Interpreter::getBuiltinCommand(&transformedCommand)) {
         int savedStdin = dup(STDIN_FILENO);
+        if(savedStdin == -1) handleExitErrno("Duplicating file descriptor failed");
         int savedStdout = dup(STDOUT_FILENO);
+        if(savedStdout == -1) handleExitErrno("Duplicating file descriptor failed");
         for (const auto &red: transformedCommand.redirections) {
             redirectToFile(&red);
         }
         (*builtInCom)(*interpreter, &transformedCommand);
-        dup2(savedStdin, STDIN_FILENO);
-        dup2(savedStdout, STDOUT_FILENO);
+        if(dup2(savedStdin, STDIN_FILENO) == -1) handleExitErrno("Duplicating file descriptor failed");
+        if(dup2(savedStdout, STDOUT_FILENO) == -1) handleExitErrno("Duplicating file descriptor failed");
+        if(close(savedStdin) == -1) handleExitErrno("Closing file descriptor failed");
+        if(close(savedStdout) == -1) handleExitErrno("Closing file descriptor failed");
         exit(0);
     }
     executeCommand(&transformedCommand);
@@ -404,8 +415,7 @@ void Interpreter::echo(const SimpleCommand *com) {
     }
     if (trim) mergedText.resize(mergedText.size() - 1);
     if (escapingMode) mergedText = performStandardCharEscaping(mergedText);
-    std::cout << mergedText << '\n'
-              << std::flush;
+    std::cout << mergedText << '\n';
 }
 const char *InterpreterError::what() const noexcept {
     return whatMsg.c_str();

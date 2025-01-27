@@ -5,6 +5,7 @@
 #include "util.h"
 #include "interpreter.hh"
 #include <filesystem>
+#include <iostream>
 #include <unordered_map>
 
 
@@ -47,4 +48,8 @@ std::string performStandardCharEscaping(std::string &text) {
         }
     }
     return escapedText;
+}
+void handleExitErrno(std::string text) {
+    std::cerr << text << "(" << std::string(strerror(errno)) << ")\n";
+    exit(errno);
 }
