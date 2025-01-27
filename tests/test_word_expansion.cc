@@ -35,5 +35,5 @@ TEST_F(WordExpansionTest, advanced_quote) {
 }
 
 TEST_F(WordExpansionTest, unmatched_quote) {
-    EXPECT_THROW(interpreter.performWordExpansions(R"('$a)"), std::runtime_error);
+    EXPECT_THROW(interpreter.performWordExpansions(R"('$a)"), InterpreterError);
 }
