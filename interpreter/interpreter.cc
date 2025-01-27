@@ -21,7 +21,7 @@ void Interpreter::interpret(std::vector<std::unique_ptr<Statement>> statements) 
     for (const auto &statement: statements) {
         try {
             statement->accept(this);
-        } catch(InterpreterError& e) {
+        } catch (InterpreterError &e) {
             this->exitCode = e.getExitCode();
             std::cerr << e.what() << "\n";
         }
@@ -33,15 +33,15 @@ void Interpreter::redirectToFile(const Redirection *redirection) {
     if (redirection->type == RedirectionType::OUT) {
         fd = open(redirection->file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
         if (fd == -1) throw InterpreterError("Error creating file", errno);
-        if(dup2(fd, STDOUT_FILENO) == -1)
+        if (dup2(fd, STDOUT_FILENO) == -1)
             throw InterpreterError("Descriptor duplication failed 1", errno);
     } else {
         fd = open(redirection->file.c_str(), O_RDONLY);
         if (fd == -1)
             throw InterpreterError("Error creating file", errno);
-        if(dup2(fd, STDIN_FILENO) == -1) throw InterpreterError("Descriptor duplication failed", errno);
+        if (dup2(fd, STDIN_FILENO) == -1) throw InterpreterError("Descriptor duplication failed", errno);
     }
-    if(close(fd)) throw InterpreterError("Failed to close descriptor", errno);
+    if (close(fd)) throw InterpreterError("Failed to close descriptor", errno);
 }
 
 void Interpreter::visit(const SimpleCommand *simpleCommand) {
@@ -50,20 +50,22 @@ void Interpreter::visit(const SimpleCommand *simpleCommand) {
     if (auto builtInCom = getBuiltinCommand(&transformedCommand)) {
         int savedStdin = dup(STDIN_FILENO);
         int savedStdout = dup(STDOUT_FILENO);
-        for (const auto & red : transformedCommand.redirections) {
+        for (const auto &red: transformedCommand.redirections) {
             redirectToFile(&red);
         }
         (*builtInCom)(*this, &transformedCommand);
         this->exitCode = 0;
         dup2(savedStdin, STDIN_FILENO);
         dup2(savedStdout, STDOUT_FILENO);
+        close(savedStdin);
+        close(savedStdout);
         return;
     }
     int forkReturn = fork();
     if (forkReturn == 0) {
         try {
             executeCommand(&transformedCommand);
-        } catch (InterpreterError& e) {
+        } catch (InterpreterError &e) {
             std::cerr << e.what() << "\n";
             exit(e.getExitCode());
         }
@@ -74,7 +76,7 @@ void Interpreter::visit(const SimpleCommand *simpleCommand) {
     // PID of the created process can be safely ignored
     int exitStatus = 0;
     int waitReturn = wait(&exitStatus);
-    if(waitReturn == -1) {
+    if (waitReturn == -1) {
         throw InterpreterError("Wait failed", errno);
     }
     this->exitCode = WEXITSTATUS(exitStatus);
@@ -123,67 +125,67 @@ void Interpreter::visit(const Pipeline *pipeline) {
     std::vector<int> pids;
     for (size_t i = 0; i < commands.size(); i++) {
         if (i == 0) {
-            if(pipe(fds1) == -1)
+            if (pipe(fds1) == -1)
                 throw InterpreterError("Pipe creation failed", errno);
             int forkReturn = fork();
-            if(forkReturn == 0) {
+            if (forkReturn == 0) {
                 try {
                     runStatementStartInPipe(commands.at(i), fds1);
-                } catch (InterpreterError& e) {
+                } catch (InterpreterError &e) {
                     std::cerr << e.what() << "\n";
                     exit(e.getExitCode());
                 }
                 exit(-1);
-            }
-            else if (forkReturn == -1) throw InterpreterError("Process creation failed", errno);
+            } else if (forkReturn == -1)
+                throw InterpreterError("Process creation failed", errno);
             pids.push_back(forkReturn);
         } else if (i == commands.size() - 1) {
             int forkReturn = fork();
-            if(forkReturn == 0) {
+            if (forkReturn == 0) {
                 try {
                     runStatementEndInPipe(commands.at(i), fds1);
-                } catch (InterpreterError& e) {
+                } catch (InterpreterError &e) {
                     std::cerr << e.what() << "\n";
                     exit(e.getExitCode());
                 }
                 exit(-1);
-            }
-            else if (forkReturn == -1) throw InterpreterError("Process creation failed", errno);
+            } else if (forkReturn == -1)
+                throw InterpreterError("Process creation failed", errno);
             pids.push_back(forkReturn);
-            if(close(fds1[0]) == -1) throw InterpreterError("Failed to close descriptor", errno);
-            if(close(fds1[1]) == -1) throw InterpreterError("Failed to close descriptor", errno);
+            if (close(fds1[0]) == -1) throw InterpreterError("Failed to close descriptor", errno);
+            if (close(fds1[1]) == -1) throw InterpreterError("Failed to close descriptor", errno);
         } else {
             int fds2[2];
-            if(pipe(fds2) == -1) throw InterpreterError("Pipe creation failed", errno);
+            if (pipe(fds2) == -1) throw InterpreterError("Pipe creation failed", errno);
             int forkReturn = fork();
-            if(forkReturn == 0) {
+            if (forkReturn == 0) {
                 try {
                     runStatementInPipe(commands.at(i), fds1, fds2);
-                } catch (InterpreterError& e) {
+                } catch (InterpreterError &e) {
                     std::cerr << e.what() << "\n";
                     exit(e.getExitCode());
                 }
                 exit(-1);
-            }
-            else if (forkReturn == -1) throw InterpreterError("Process creation failed", errno);
+            } else if (forkReturn == -1)
+                throw InterpreterError("Process creation failed", errno);
             pids.push_back(forkReturn);
-            if(close(fds1[0]) == -1) throw InterpreterError("Failed to close descriptor", errno);
-            if(close(fds1[1]) == -1) throw InterpreterError("Failed to close descriptor", errno);
+            if (close(fds1[0]) == -1) throw InterpreterError("Failed to close descriptor", errno);
+            if (close(fds1[1]) == -1) throw InterpreterError("Failed to close descriptor", errno);
             fds1[0] = fds2[0];
             fds1[1] = fds2[1];
         }
     }
     int lastExitStatus = 0;
-    for (int pid : pids) {
+    for (int pid: pids) {
         waitpid(pid, &lastExitStatus, 0);
     }
     this->exitCode = WEXITSTATUS(lastExitStatus);
 }
 
 void Interpreter::runStatementStartInPipe(const Statement *stmt, int fds[]) {
-    if(dup2(fds[1], 1) == -1) throw InterpreterError("Descriptor duplication failed", errno);
-    if(close(fds[1]) == -1) throw InterpreterError("Failed to close descriptor", errno);
-    if(close(fds[0]) == -1) throw InterpreterError("Failed to close descriptor", errno);
+    if (dup2(fds[1], 1) == -1) throw InterpreterError("Descriptor duplication failed", errno);
+    if (close(fds[1]) == -1) throw InterpreterError("Failed to close descriptor", errno);
+    if (close(fds[0]) == -1) throw InterpreterError("Failed to close descriptor", errno);
 
     PipelineExecutor executor(this);
     stmt->accept(&executor);
@@ -191,9 +193,9 @@ void Interpreter::runStatementStartInPipe(const Statement *stmt, int fds[]) {
 }
 
 void Interpreter::runStatementEndInPipe(const Statement *stmt, int fds[]) {
-    if(dup2(fds[0], 0) == -1) throw InterpreterError("Descriptor duplication failed", errno);
-    if(close(fds[0]) == -1) throw InterpreterError("Failed to close descriptor", errno);
-    if(close(fds[1]) == -1) throw InterpreterError("Failed to close descriptor", errno);
+    if (dup2(fds[0], 0) == -1) throw InterpreterError("Descriptor duplication failed", errno);
+    if (close(fds[0]) == -1) throw InterpreterError("Failed to close descriptor", errno);
+    if (close(fds[1]) == -1) throw InterpreterError("Failed to close descriptor", errno);
 
     PipelineExecutor executor(this);
     stmt->accept(&executor);
@@ -201,12 +203,12 @@ void Interpreter::runStatementEndInPipe(const Statement *stmt, int fds[]) {
 }
 
 void Interpreter::runStatementInPipe(const Statement *stmt, int fds1[], int fds2[]) {
-    if(close(fds1[1]) == -1) throw InterpreterError("Failed to close descriptor", errno);
-    if(close(fds2[0]) == -1) throw InterpreterError("Failed to close descriptor", errno);
-    if(dup2(fds1[0], 0) == -1) throw InterpreterError("Descriptor duplication failed", errno);
-    if(dup2(fds2[1], 1) == -1) throw InterpreterError("Descriptor duplication failed", errno);
-    if(close(fds1[0]) == -1) throw InterpreterError("Failed to close descriptor", errno);
-    if(close(fds2[1]) == -1) throw InterpreterError("Failed to close descriptor", errno);
+    if (close(fds1[1]) == -1) throw InterpreterError("Failed to close descriptor", errno);
+    if (close(fds2[0]) == -1) throw InterpreterError("Failed to close descriptor", errno);
+    if (dup2(fds1[0], 0) == -1) throw InterpreterError("Descriptor duplication failed", errno);
+    if (dup2(fds2[1], 1) == -1) throw InterpreterError("Descriptor duplication failed", errno);
+    if (close(fds1[0]) == -1) throw InterpreterError("Failed to close descriptor", errno);
+    if (close(fds2[1]) == -1) throw InterpreterError("Failed to close descriptor", errno);
 
     PipelineExecutor executor(this);
     stmt->accept(&executor);
@@ -219,7 +221,7 @@ void Interpreter::PipelineExecutor::visit(const SimpleCommand *simpleCommand) {
     if (auto builtInCom = Interpreter::getBuiltinCommand(&transformedCommand)) {
         int savedStdin = dup(STDIN_FILENO);
         int savedStdout = dup(STDOUT_FILENO);
-        for(const auto & red : transformedCommand.redirections) {
+        for (const auto &red: transformedCommand.redirections) {
             redirectToFile(&red);
         }
         (*builtInCom)(*interpreter, &transformedCommand);
@@ -267,7 +269,7 @@ void Interpreter::visit(const Subshell *subshell) {
             yy::parser parser(lexer, interpreter, false);
             parser();
             exit(interpreter.exitCode);
-        } catch (InterpreterError& e) {
+        } catch (InterpreterError &e) {
             std::cerr << e.what() << "\n";
             exit(e.getExitCode());
         }
@@ -276,14 +278,14 @@ void Interpreter::visit(const Subshell *subshell) {
     }
     int exitStatus = 0;
     int waitReturn = wait(&exitStatus);
-    if(waitReturn == -1) {
+    if (waitReturn == -1) {
         throw InterpreterError("Wait failed", errno);
     }
     this->exitCode = WEXITSTATUS(exitStatus);
 }
 
 std::string Interpreter::getSymbol(const std::string &name) {
-    if(name == "?") return std::to_string(this->exitCode);
+    if (name == "?") return std::to_string(this->exitCode);
     auto varValue = variables.find(name);
     if (varValue == variables.end()) {
         auto envValue = getenv(name.c_str());
@@ -326,7 +328,7 @@ SimpleCommand Interpreter::transformCommand(const SimpleCommand &com) {
     SimpleCommand transformedCommand(com);
     transformedCommand.name = performWordExpansions(com.name);
 
-    const auto argTransformation = [this](const auto& text) { return this->performWordExpansions(text); };
+    const auto argTransformation = [this](const auto &text) { return this->performWordExpansions(text); };
     std::transform(com.args.begin(), com.args.end(), transformedCommand.args.begin(), argTransformation);
     return transformedCommand;
 }
@@ -372,7 +374,7 @@ void Interpreter::runScript(const SimpleCommand *com) {
 
 void Interpreter::exportVar(const SimpleCommand *com) {
     if (com->args.size() != 1) throw InterpreterError("Expected var name");
-    if(setenv(com->args[0].c_str(), getSymbol(com->args[0]).c_str(), true))
+    if (setenv(com->args[0].c_str(), getSymbol(com->args[0]).c_str(), true))
         throw InterpreterError("setenv failed", errno);
 }
 
@@ -381,8 +383,7 @@ const std::initializer_list<std::pair<std::string, std::function<void(Interprete
         {".", [](Interpreter &interpreter, auto com) { interpreter.runScript(com); }},
         {"export", [](Interpreter &interpreter, auto com) { interpreter.exportVar(com); }},
         {"pwd", [](Interpreter &interpreter, auto com) { interpreter.pwd(com); }},
-        {"echo", [](Interpreter &interpreter, auto com){ interpreter.echo(com);}}
-};
+        {"echo", [](Interpreter &interpreter, auto com) { interpreter.echo(com); }}};
 void Interpreter::pwd(const SimpleCommand *com) {
     if (!com->args.empty()) throw InterpreterError("Expected no arguments");
     char buf[4096];
@@ -393,18 +394,19 @@ void Interpreter::pwd(const SimpleCommand *com) {
 }
 void Interpreter::echo(const SimpleCommand *com) {
     bool escapingMode = false;
-    if(!com->args.empty() && com->args[0] == "-e") escapingMode = true;
+    if (!com->args.empty() && com->args[0] == "-e") escapingMode = true;
     std::string mergedText;
     bool trim = false;
-    for(int i = escapingMode ? 1 : 0; i < com->args.size(); i++) {
+    for (int i = escapingMode ? 1 : 0; i < com->args.size(); i++) {
         mergedText += com->args.at(i);
         mergedText += ' ';
         trim = true;
     }
-    if(trim) mergedText.resize(mergedText.size() - 1);
-    if(escapingMode) mergedText = performStandardCharEscaping(mergedText);
-    std::cout << mergedText << '\n';
+    if (trim) mergedText.resize(mergedText.size() - 1);
+    if (escapingMode) mergedText = performStandardCharEscaping(mergedText);
+    std::cout << mergedText << '\n'
+              << std::flush;
 }
-const char * InterpreterError::what() const noexcept {
+const char *InterpreterError::what() const noexcept {
     return whatMsg.c_str();
 }
